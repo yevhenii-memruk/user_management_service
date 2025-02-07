@@ -43,3 +43,8 @@ skip-string-normalization = false
 profile = "black"
 line_length = 79
 multi_line_output = 3
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = true
+disallow_untyped_defs = true

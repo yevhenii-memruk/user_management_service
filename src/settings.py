@@ -1,6 +1,8 @@
-from typing import Literal
+from typing import Literal, TypeAlias
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+LogLevel: TypeAlias = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 class Settings(BaseSettings):
@@ -8,11 +10,9 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str = "User Management Service"
     DEBUG: bool = False
-    LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = (
-        "INFO"
-    )
+    LOG_LEVEL: LogLevel = "INFO"
 
-    # Postgresql
+    # PostgreSQL
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_HOST: str
@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     RABBITMQ_HOST: str
     RABBITMQ_PORT: int
 
-    def get_postgres_url(self) -> str:
+    @property
+    def postgres_url(self) -> str:
         return (
             f"postgresql+asyncpg://"
             f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"

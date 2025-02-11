@@ -14,13 +14,15 @@ RUN python -m pip install --upgrade pip && \
 
 COPY pyproject.toml poetry.lock ./
 
-COPY scripts/entrypoint.sh /app/scripts/entrypoint.sh
-COPY src /app/src
-
 RUN --mount=type=cache,target=/root/.cache/pypoetry \
     poetry install --no-root --no-interaction --no-ansi
 
+RUN pip uninstall -y poetry
+
 FROM python:3.11-slim as final
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
 # Set up a non-root user for better security
 RUN useradd -m appuser

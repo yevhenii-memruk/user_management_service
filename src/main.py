@@ -1,27 +1,26 @@
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import uvicorn
 from fastapi import FastAPI
-from pydantic import BaseModel
 
-from src.logger import configure_logger, logger
+from src.logger import configure_logger
+from src.schemas.health import HealthCheckResponse
 from src.settings import settings
+
+configure_logger()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    configure_logger()
-    logger.info("success: Logger configured.")
+    logger.info("App startup")
     yield  # app starts
-    logger.info("Shutting down.")
+    logger.info("App shutdown")
 
 
 app = FastAPI(lifespan=lifespan, title=settings.PROJECT_NAME)
-
-
-class HealthCheckResponse(BaseModel):
-    message: str
 
 
 @app.get("/healthcheck", response_model=HealthCheckResponse)

@@ -9,13 +9,13 @@ from src.logger import configure_logger
 from src.schemas.health import HealthCheckResponse
 from src.settings import settings
 
-configure_logger()
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("App startup")
+    configure_logger()
+    # logger.info("App startup")
     yield  # app starts
     logger.info("App shutdown")
 

@@ -1,13 +1,11 @@
 from typing import Literal, TypeAlias
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 LogLevel: TypeAlias = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict()
-
     PROJECT_NAME: str = "User Management Service"
     DEBUG: bool = False
     LOG_LEVEL: LogLevel = "INFO"

@@ -4,9 +4,6 @@ from logging.config import dictConfig
 
 from src.settings import settings
 
-# from logging.handlers import RotatingFileHandler
-
-
 logging_config = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -27,7 +24,7 @@ logging_config = {
             "level": settings.LOG_LEVEL,
             "class": "logging.handlers.RotatingFileHandler",
             "formatter": "default",
-            "filename": "logs/app.log",
+            "filename": settings.LOG_DIR,
             "mode": "a",
             "maxBytes": 5 * 1024 * 1024,  # 5MB limit
             "backupCount": 3,

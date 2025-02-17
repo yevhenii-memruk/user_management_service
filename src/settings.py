@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "User Management Service"
     DEBUG: bool = False
     LOG_LEVEL: LogLevel = "INFO"
+    LOG_DIR: str = "logs"
 
     # PostgreSQL
     POSTGRES_USER: str

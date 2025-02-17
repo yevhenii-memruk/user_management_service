@@ -8,6 +8,7 @@ services:
     container_name: user_management_apps
     volumes:
       - .:/app
+      - ./logs:/app/logs
     networks:
       - backend
     depends_on:

@@ -6,11 +6,11 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from src.db import DATABASE_URL
-from src.db.models import Base, Group, User
+from src.db.models import Base
+from src.settings import settings
 
 config = context.config
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.postgres_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

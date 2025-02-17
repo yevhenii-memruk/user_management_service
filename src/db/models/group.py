@@ -4,7 +4,7 @@ from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from src.db.models import Base
+from src.db.models import Base, User
 
 
 class Group(Base):
@@ -17,7 +17,7 @@ class Group(Base):
     )
 
     # Relationship
-    users: Mapped[list["User"]] = relationship("User", back_populates="group")
+    users: Mapped[list[User]] = relationship("User", back_populates="group")
 
     def __repr__(self) -> str:
         return f"<Group id: {self.id}, name: {self.name}>"

@@ -1,12 +1,11 @@
 import enum
 import uuid
-from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from src.db.models import Base
+from src.db.models import Base, Group
 
 
 class Role(enum.Enum):
@@ -45,7 +44,7 @@ class User(Base):
     )
 
     # Relationship
-    group: Mapped["Group"] = relationship("Group", back_populates="users")
+    group: Mapped[Group] = relationship("Group", back_populates="users")
 
     def __repr__(self) -> str:
         return f"<User id: {self.id}, username: {self.username}>"

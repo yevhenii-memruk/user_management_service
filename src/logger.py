@@ -1,9 +1,11 @@
 import logging
 import sys
 from logging.config import dictConfig
-# from logging.handlers import RotatingFileHandler
 
 from src.settings import settings
+
+# from logging.handlers import RotatingFileHandler
+
 
 logging_config = {
     "version": 1,

@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.logger import configure_logger
 from src.schemas.health import HealthCheckResponse
@@ -15,12 +16,19 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     configure_logger()
-    # logger.info("App startup")
     yield  # app starts
     logger.info("App shutdown")
 
 
 app = FastAPI(lifespan=lifespan, title=settings.PROJECT_NAME)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 
 @app.get("/healthcheck", response_model=HealthCheckResponse)

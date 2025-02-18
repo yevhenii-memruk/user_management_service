@@ -1,10 +1,8 @@
-from datetime import datetime
-
-from sqlalchemy import DateTime, String
+from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
 
 from src.db.models import Base, User
+from src.db.models.user import Timestamp
 
 
 class Group(Base):
@@ -12,12 +10,12 @@ class Group(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    created_at: Mapped[Timestamp]
 
     # Relationship
-    users: Mapped[list[User]] = relationship("User", back_populates="group")
+    users: Mapped[list[User]] = relationship(
+        "User", back_populates="group", lazy="joined"
+    )
 
     def __repr__(self) -> str:
         return f"<Group id: {self.id}, name: {self.name}>"

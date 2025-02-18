@@ -1,5 +1,6 @@
-import enum
 import uuid
+from enum import StrEnum
+from typing import Annotated
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -7,8 +8,12 @@ from sqlalchemy.sql import func
 
 from src.db.models import Base, Group
 
+Timestamp = Annotated[
+    DateTime, mapped_column(DateTime, server_default=func.now())
+]
 
-class Role(enum.Enum):
+
+class Role(StrEnum):
     USER = "USER"
     ADMIN = "ADMIN"
     MODERATOR = "MODERATOR"
@@ -31,11 +36,9 @@ class User(Base):
     role: Mapped[Role] = mapped_column(Enum(Role), default=Role.USER)
     image_s3_path: Mapped[str] = mapped_column(String(), nullable=True)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[DateTime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
-    modified_at: Mapped[DateTime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.current_timestamp()
+    created_at: Mapped[Timestamp]
+    modified_at: Mapped[Timestamp] = mapped_column(
+        server_default=func.now(), onupdate=func.current_timestamp()
     )
 
     # Foreign Key to Group

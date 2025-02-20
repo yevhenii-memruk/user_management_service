@@ -6,7 +6,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from src.db.models import Base, Group
+from src.db.models import Base
 
 Timestamp = Annotated[
     DateTime, mapped_column(DateTime, server_default=func.now())
@@ -38,7 +38,7 @@ class User(Base):
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[Timestamp]
     modified_at: Mapped[Timestamp] = mapped_column(
-        server_default=func.now(), onupdate=func.current_timestamp()
+        onupdate=func.current_timestamp()
     )
 
     # Foreign Key to Group
@@ -47,7 +47,9 @@ class User(Base):
     )
 
     # Relationship
-    group: Mapped[Group] = relationship("Group", back_populates="users")
+    group: Mapped["Group"] = relationship(
+        "Group", back_populates="users", lazy="joined"
+    )
 
     def __repr__(self) -> str:
         return f"<User id: {self.id}, username: {self.username}>"

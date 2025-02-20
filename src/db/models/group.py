@@ -1,7 +1,7 @@
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.db.models import Base, User
+from src.db.models import Base
 from src.db.models.user import Timestamp
 
 
@@ -13,7 +13,7 @@ class Group(Base):
     created_at: Mapped[Timestamp]
 
     # Relationship
-    users: Mapped[list[User]] = relationship(
+    users: Mapped[list["User"]] = relationship(
         "User", back_populates="group", lazy="joined"
     )
 

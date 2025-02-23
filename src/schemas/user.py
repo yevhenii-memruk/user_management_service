@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import UUID4, BaseModel, EmailStr, Field
+from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
 
 
 class Role(str, Enum):
@@ -33,15 +33,14 @@ class UserDisplay(UserBase):
 
     # Allows Pydantic to extract data from SQLAlchemy ORM models,
     # treating them like dictionaries
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     surname: Optional[str] = Field(None, min_length=1, max_length=100)
     username: Optional[str] = Field(None, min_length=3, max_length=100)
-    email: Optional[EmailStr]
+    email: Optional[EmailStr] = None
     phone_number: Optional[str] = Field(None, min_length=10, max_length=15)
-    role: Optional[Role]
-    is_blocked: Optional[bool]
+    role: Optional[Role] = None
+    is_blocked: Optional[bool] = None

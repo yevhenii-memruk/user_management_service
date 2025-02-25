@@ -3,10 +3,11 @@ from pydantic import BaseModel, Field
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
 
 
-class TokenRefreshRequest(Token):
+class TokenRefreshRequest(BaseModel):
     refresh_token: str = Field(..., min_length=20)
 
 

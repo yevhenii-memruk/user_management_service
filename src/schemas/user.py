@@ -5,13 +5,13 @@ from typing import Optional
 from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
 
 
-class Role(str, Enum):
+class UserRole(str, Enum):
     ADMIN = "ADMIN"
     MODERATOR = "MODERATOR"
     USER = "USER"
 
 
-class UserBase(BaseModel):
+class UserSchema(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     surname: str = Field(..., min_length=1, max_length=100)
     username: str = Field(..., min_length=3, max_length=100)
@@ -19,13 +19,14 @@ class UserBase(BaseModel):
     phone_number: Optional[str] = Field(None, min_length=10, max_length=15)
 
 
-class UserCreate(UserBase):
+class UserCreateSchema(UserSchema):
     password: str = Field(..., min_length=8, max_length=128)
+    group_id: Optional[int] = None
 
 
-class UserDisplay(UserBase):
+class UserResponseSchema(UserSchema):
     id: UUID4
-    role: Role
+    role: UserRole
     is_blocked: bool = False
     created_at: datetime
     modified_at: datetime
@@ -36,11 +37,11 @@ class UserDisplay(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class UserUpdate(BaseModel):
+class UserUpdateSchema(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     surname: Optional[str] = Field(None, min_length=1, max_length=100)
     username: Optional[str] = Field(None, min_length=3, max_length=100)
     email: Optional[EmailStr] = None
     phone_number: Optional[str] = Field(None, min_length=10, max_length=15)
-    role: Optional[Role] = None
+    role: Optional[UserRole] = None
     is_blocked: Optional[bool] = None

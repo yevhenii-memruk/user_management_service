@@ -6,11 +6,11 @@ import pytest
 from pydantic import ValidationError
 
 from src.schemas.user import (
-    Role,
-    UserBase,
-    UserCreate,
-    UserDisplay,
-    UserUpdate,
+    UserCreateSchema,
+    UserResponseSchema,
+    UserRole,
+    UserSchema,
+    UserUpdateSchema,
 )
 
 
@@ -51,7 +51,7 @@ class TestUserBase:
     def test_valid_user_base(
         self, valid_user_base_data: dict[str, str]
     ) -> None:
-        user = UserBase(**valid_user_base_data)
+        user = UserSchema(**valid_user_base_data)
         assert user.name == valid_user_base_data["name"]
         assert user.surname == valid_user_base_data["surname"]
         assert user.username == valid_user_base_data["username"]
@@ -98,7 +98,7 @@ class TestUserBase:
         data = valid_user_base_data.copy()
         data[field] = value
         with pytest.raises(ValidationError) as exc_info:
-            UserBase(**data)
+            UserSchema(**data)
         assert expected_error in str(exc_info.value)
 
 
@@ -106,8 +106,9 @@ class TestUserCreate:
     def test_valid_user_create(
         self, valid_user_create_data: dict[str, str]
     ) -> None:
-        user = UserCreate(**valid_user_create_data)
+        user = UserCreateSchema(**valid_user_create_data)
         assert user.password == valid_user_create_data["password"]
+        assert user.group_id == valid_user_create_data["group_id"]
 
     @pytest.mark.parametrize(
         "password,expected_error",
@@ -125,7 +126,7 @@ class TestUserCreate:
         data = valid_user_create_data.copy()
         data["password"] = password
         with pytest.raises(ValidationError) as exc_info:
-            UserCreate(**data)
+            UserCreateSchema(**data)
         assert expected_error in str(exc_info.value)
 
 
@@ -133,21 +134,21 @@ class TestUserDisplay:
     def test_valid_user_display(
         self, valid_user_display_data: dict[str, str]
     ) -> None:
-        user = UserDisplay(**valid_user_display_data)
+        user = UserResponseSchema(**valid_user_display_data)
         assert isinstance(user.id, UUID)
-        assert user.role == Role.USER
+        assert user.role == UserRole.USER
         assert isinstance(user.created_at, datetime)
         assert isinstance(user.modified_at, datetime)
         assert user.group_id == 1
 
     @pytest.mark.parametrize("role", ["ADMIN", "MODERATOR", "USER"])
     def test_valid_roles(
-        self, valid_user_display_data: dict[str, str], role: Role
+        self, valid_user_display_data: dict[str, str], role: UserRole
     ) -> None:
         data = valid_user_display_data.copy()
         data["role"] = role
-        user = UserDisplay(**data)
-        assert user.role == Role(role)
+        user = UserResponseSchema(**data)
+        assert user.role == UserRole(role)
 
     def test_invalid_role(
         self, valid_user_display_data: dict[str, str]
@@ -155,7 +156,7 @@ class TestUserDisplay:
         data = valid_user_display_data.copy()
         data["role"] = "INVALID_ROLE"
         with pytest.raises(ValidationError) as exc_info:
-            UserDisplay(**data)
+            UserResponseSchema(**data)
         assert "Input should be 'ADMIN', 'MODERATOR' or 'USER'" in str(
             exc_info.value
         )
@@ -163,14 +164,14 @@ class TestUserDisplay:
 
 class TestUserUpdate:
     def test_empty_update(self) -> None:
-        user = UserUpdate()
+        user = UserUpdateSchema()
         assert all(value is None for value in user.model_dump().values())
 
     def test_partial_update(
         self, valid_user_base_data: dict[str, str]
     ) -> None:
         update_data = {"name": "Jane", "email": "jane.doe@example.com"}
-        user = UserUpdate(**update_data)
+        user = UserUpdateSchema(**update_data)
         assert user.name == "Jane"
         assert user.email == "jane.doe@example.com"
         assert user.surname is None
@@ -202,5 +203,5 @@ class TestUserUpdate:
     ) -> None:
         data = {field: value}
         with pytest.raises(ValidationError) as exc_info:
-            UserUpdate(**data)
+            UserUpdateSchema(**data)
         assert expected_error in str(exc_info.value)

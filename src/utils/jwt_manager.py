@@ -4,53 +4,45 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import jwt
-from fastapi import FastAPI, HTTPException, status
-
-from src.settings import settings
+from fastapi import HTTPException, status
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Tokens:
     access_token: str
     refresh_token: str
 
 
 class JWTManager:
-    def __init__(self, app: FastAPI):
-        self.key = settings.JWT_SECRET_KEY
-        self.algorithm = settings.JWT_ALGORITHM
-        self.expires_days = settings.JWT_EXPIRATION_DAYS
-        self.expires_minutes = settings.JWT_EXPIRATION_MINUTES
-        self.refresh_token_len = 64
+    def __init__(
+        self,
+        secret_key: str,
+        algorithm: str,
+        expires_minutes: int,
+        refresh_token_len: int = 64,
+    ):
+        self.secret_key = secret_key
+        self.algorithm = algorithm
+        self.expires_minutes = expires_minutes
+        self.refresh_token_len = refresh_token_len
 
-    def _create_jwt_token(
-        self, data: dict[str, Any], expires_delta: timedelta | None = None
-    ) -> str:
+    def _create_jwt_token(self, data: dict[str, Any]) -> str:
         """Generate a JWT token with an expired time."""
         to_encode = data.copy()
-
-        if expires_delta:
-            expire = datetime.now(timezone.utc) + expires_delta
-        else:
-            expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=self.expires_minutes
+        )
         to_encode.update({"exp": expire})
 
         return jwt.encode(
             payload=to_encode,
-            key=self.key,
+            key=self.secret_key,
             algorithm=self.algorithm,
         )
 
     def get_tokens(self, payload: dict) -> Tokens:
         """Generate both access and refresh tokens."""
-
-        # Generate an access token (short-lived).
-        access_token = self._create_jwt_token(
-            payload,
-            timedelta(minutes=self.expires_minutes),
-        )
-
+        access_token = self._create_jwt_token(payload)
         refresh_token = secrets.token_hex(self.refresh_token_len)
 
         return Tokens(access_token, refresh_token)
@@ -60,7 +52,7 @@ class JWTManager:
         try:
             return jwt.decode(
                 jwt=token,
-                key=self.key,
+                key=self.secret_key,
                 algorithms=[self.algorithm],
             )
         except jwt.ExpiredSignatureError:

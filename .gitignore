@@ -15,3 +15,7 @@ venv.bak/
 
 # Logs
 logs/
+
+# Alembic migrations cache
+migrations/versions/*.pyc
+migrations/versions/__pycache__/

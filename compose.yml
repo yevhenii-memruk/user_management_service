@@ -6,10 +6,9 @@ services:
     ports:
       - "8000:8000"
     container_name: user_management_apps
-    env_file:
-      - .env
     volumes:
       - .:/app
+      - ./logs:/app/logs
     networks:
       - backend
     depends_on:
@@ -52,8 +51,6 @@ services:
     image: rabbitmq:3-management
     container_name: user_management_rabbitmq
     restart: always
-    env_file:
-      - .env
     ports:
       - "5671:5672"  # AMQP protocol
       - "15672:15672"  # Management UI

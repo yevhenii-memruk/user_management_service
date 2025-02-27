@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     LOG_LEVEL: LogLevel = "INFO"
     LOG_DIR: str = "logs"
 
+    # JWT
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 30
+    JWT_EXPIRE_DAYS: int = 7
+    JWT_SECRET_KEY: str
+
     # PostgreSQL
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str

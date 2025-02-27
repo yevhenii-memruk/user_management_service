@@ -28,14 +28,14 @@ class JWTManager:
 
     def _create_jwt_token(self, data: dict[str, Any]) -> str:
         """Generate a JWT token with an expired time."""
-        to_encode = data.copy()
+        payload = data.copy()
         expire = datetime.now(timezone.utc) + timedelta(
             minutes=self.expires_minutes
         )
-        to_encode.update({"exp": expire})
+        payload.update({"exp": expire})
 
         return jwt.encode(
-            payload=to_encode,
+            payload=payload,
             key=self.secret_key,
             algorithm=self.algorithm,
         )

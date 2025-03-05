@@ -5,6 +5,7 @@ from typing import Any
 
 import jwt
 from fastapi import HTTPException, status
+from jwt.exceptions import InvalidTokenError
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,13 +27,15 @@ class JWTManager:
         self.expires_minutes = expires_minutes
         self.refresh_token_len = refresh_token_len
 
-    def _create_jwt_token(self, data: dict[str, Any]) -> str:
+    def _create_jwt_token(
+        self, data: dict[str, Any], token_type: str = "access"
+    ) -> str:
         """Generate a JWT token with an expired time."""
         payload = data.copy()
         expire = datetime.now(timezone.utc) + timedelta(
             minutes=self.expires_minutes
         )
-        payload.update({"exp": expire})
+        payload.update({"exp": expire, "type": token_type})
 
         return jwt.encode(
             payload=payload,
@@ -42,15 +45,19 @@ class JWTManager:
 
     def get_tokens(self, payload: dict) -> Tokens:
         """Generate both access and refresh tokens."""
-        access_token = self._create_jwt_token(payload)
+        payload_copy = payload.copy()
+        access_token = self._create_jwt_token(payload_copy, "access")
+        # refresh_token = self._create_jwt_token(payload_copy, "refresh")
         refresh_token = secrets.token_hex(self.refresh_token_len)
 
         return Tokens(access_token, refresh_token)
 
-    def get_payload(self, token: str) -> dict[str, Any]:
+    def decode_jwt_token(
+        self, token: str, token_type: str = "access"
+    ) -> dict[str, Any]:
         """Verify and decode a JWT token."""
         try:
-            return jwt.decode(
+            payload = jwt.decode(
                 jwt=token,
                 key=self.secret_key,
                 algorithms=[self.algorithm],
@@ -73,3 +80,10 @@ class JWTManager:
                 detail="Invalid token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        # Verify token type
+        if payload.get("type") != token_type:
+            raise InvalidTokenError(
+                f"Token type mismatch: expected {token_type}"
+            )
+
+        return payload

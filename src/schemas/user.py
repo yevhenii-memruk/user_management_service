@@ -17,24 +17,11 @@ class UserSchema(BaseModel):
     username: str = Field(..., min_length=3, max_length=100)
     email: EmailStr
     phone_number: Optional[str] = Field(None, min_length=10, max_length=15)
+    group_id: Optional[int] = None
 
 
 class UserCreateSchema(UserSchema):
     password: str = Field(..., min_length=8, max_length=128)
-    group_id: Optional[int] = None
-
-
-class UserResponseSchema(UserSchema):
-    id: UUID4
-    role: UserRole
-    is_blocked: bool = False
-    created_at: datetime
-    modified_at: datetime
-    group_id: Optional[int] = None
-
-    # Allows Pydantic to extract data from SQLAlchemy ORM models,
-    # treating them like dictionaries
-    model_config = ConfigDict(from_attributes=True)
 
 
 class UserUpdateSchema(BaseModel):
@@ -45,3 +32,17 @@ class UserUpdateSchema(BaseModel):
     phone_number: Optional[str] = Field(None, min_length=10, max_length=15)
     role: Optional[UserRole] = None
     is_blocked: Optional[bool] = None
+
+
+class UserInDB(UserSchema):
+    id: UUID4
+    created_at: datetime
+    modified_at: datetime
+
+    # Allows Pydantic to extract data from SQLAlchemy ORM models,
+    # treating them like dictionaries
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserResponseSchema(UserInDB):
+    pass

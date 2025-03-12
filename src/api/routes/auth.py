@@ -1,16 +1,22 @@
+import logging
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.database import get_session
-from src.schemas.auth import SignupRequest, TokenResponse
+from src.api.dependencies.redis import get_redis
+from src.db.models import User
+from src.schemas.auth import SignupRequest, TokenRefreshRequest, TokenResponse
 from src.schemas.user import UserCreateSchema, UserResponseSchema
 from src.services.auth import AuthService
 from src.services.user import UserService
 from src.utils.password_manager import PasswordManager
 
+logger = logging.getLogger(f"ums.{__name__}")
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 db_dependency = Annotated[AsyncSession, Depends(get_session)]
@@ -25,19 +31,33 @@ async def signup(
     user_data: SignupRequest,
     db: db_dependency,
     password_manager: PasswordManager = Depends(PasswordManager),
-) -> UserResponseSchema:
+) -> User:
+    logger.debug(f"user_data={user_data}")
+
     """
     Register a new user in the system.
     """
     user_service = UserService(db)
-    existing_user = await user_service.get_user_by_email_or_username(
-        email=user_data.email, username=user_data.username
-    )
+    try:
+        existing_user = await user_service.get_user_by_email_or_username(
+            email=user_data.email, username=user_data.username
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User with this email or username already exists",
         )
+    # Validate User group_id, checks if id exists in Group table
+    if user_data.group_id:
+        group_id = await user_service.check_group_exists(user_data.group_id)
+        if not group_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Group not found.",
+            )
 
     # Create new user with hashed password
     hashed_password = password_manager.get_hash(user_data.password)
@@ -51,22 +71,87 @@ async def signup(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
-    db: db_dependency, form_data: OAuth2PasswordRequestForm = Depends()
+    db: db_dependency,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    redis: Redis = Depends(get_redis),
 ) -> TokenResponse:
     """
     Authenticate user and return access and refresh tokens.
     Login can be done with username or email.
     """
-    auth_service = AuthService(db)
+    auth_service = AuthService(db, redis)
     user = await auth_service.authenticate_user(
         login=form_data.username, password=form_data.password
     )
+
     return user
 
 
+# POST /auth/refresh-token
 @router.post("/refresh-token", response_model=TokenResponse)
-async def refresh_token() -> None:
-    pass
+async def refresh_token(
+    request: TokenRefreshRequest,
+    db: db_dependency,
+    redis: Redis = Depends(get_redis),
+) -> TokenResponse:
+    """
+    Refresh the access token using a valid refresh token.
+    The old refresh token is blacklisted.
+    """
+    auth_service = AuthService(db, redis)
+    user_service = UserService(db)
+    try:
+        is_blacklisted = await redis.exists(
+            f"blacklist:{request.refresh_token}"
+        )
+        if is_blacklisted:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Get the user ID associated with this refresh token from Redis
+        user_id = await redis.get(f"refresh_token:{request.refresh_token}")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Delete old refresh token from Redis
+        await redis.delete(f"refresh_token:{request.refresh_token}")
+
+        # Add refresh token to blacklist
+        await redis.setex(
+            f"blacklist:{request.refresh_token}", 3600, "blacklisted"
+        )
+
+        user = await user_service.get_user_by_id(UUID(user_id))
+        if not user:
+            # Token exists but user does not
+            await redis.delete(f"refresh_token:{request.refresh_token}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Validate and refresh the tokens
+        new_access_token, new_refresh_token = (
+            await auth_service.refresh_tokens(request.refresh_token, user)
+        )
+        return TokenResponse(
+            access_token=new_access_token, refresh_token=new_refresh_token
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 @router.post("/reset-password")

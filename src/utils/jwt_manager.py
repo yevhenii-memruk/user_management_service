@@ -5,7 +5,6 @@ from typing import Any
 
 import jwt
 from fastapi import HTTPException, status
-from jwt.exceptions import InvalidTokenError
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,14 +46,11 @@ class JWTManager:
         """Generate both access and refresh tokens."""
         payload_copy = payload.copy()
         access_token = self._create_jwt_token(payload_copy, "access")
-        # refresh_token = self._create_jwt_token(payload_copy, "refresh")
         refresh_token = secrets.token_hex(self.refresh_token_len)
 
         return Tokens(access_token, refresh_token)
 
-    def decode_jwt_token(
-        self, token: str, token_type: str = "access"
-    ) -> dict[str, Any]:
+    def decode_jwt_token(self, token: str) -> dict[str, Any]:
         """Verify and decode a JWT token."""
         try:
             payload = jwt.decode(
@@ -79,11 +75,6 @@ class JWTManager:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
-        # Verify token type
-        if payload.get("type") != token_type:
-            raise InvalidTokenError(
-                f"Token type mismatch: expected {token_type}"
             )
 
         return payload

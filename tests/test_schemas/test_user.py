@@ -5,10 +5,10 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
+from src.db.models.user import Role
 from src.schemas.user import (
     UserCreateSchema,
     UserResponseSchema,
-    UserRole,
     UserSchema,
     UserUpdateSchema,
 )
@@ -136,19 +136,19 @@ class TestUserDisplay:
     ) -> None:
         user = UserResponseSchema(**valid_user_display_data)
         assert isinstance(user.id, UUID)
-        assert user.role == UserRole.USER
+        assert user.role == Role.USER
         assert isinstance(user.created_at, datetime)
         assert isinstance(user.modified_at, datetime)
         assert user.group_id == 1
 
     @pytest.mark.parametrize("role", ["ADMIN", "MODERATOR", "USER"])
     def test_valid_roles(
-        self, valid_user_display_data: dict[str, str], role: UserRole
+        self, valid_user_display_data: dict[str, str], role: Role
     ) -> None:
         data = valid_user_display_data.copy()
         data["role"] = role
         user = UserResponseSchema(**data)
-        assert user.role == UserRole(role)
+        assert user.role == Role(role)
 
     def test_invalid_role(
         self, valid_user_display_data: dict[str, str]

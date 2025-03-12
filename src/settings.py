@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # JWT
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 30
+    JWT_EXPIRE_MINUTES: int = 30 * 60
     JWT_EXPIRE_DAYS: int = 7
     JWT_SECRET_KEY: str
 

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.models import User
 from src.schemas.auth import TokenResponse
 from src.settings import settings
+from src.utils.exceptions import InvalidTokenError, UserNotFoundError
 from src.utils.jwt_manager import JWTManager
 from src.utils.password_manager import PasswordManager
 
@@ -81,8 +82,11 @@ class AuthService:
                 detail="User is blocked",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        return await self._create_user_tokens(user)
 
-        # Create access and refresh tokens
+    async def _create_user_tokens(self, user: User) -> TokenResponse:
+        """Create access and refresh tokens for a user and store in Redis"""
+        # Create tokens
         tokens = self.jwt_manager.get_tokens(
             payload={
                 "sub": user.username,
@@ -97,51 +101,52 @@ class AuthService:
         try:
             await self.redis_client.setex(
                 f"refresh_token:{refresh_token}",
-                settings.JWT_EXPIRE_DAYS * 86400,  # Convert days to seconds
+                settings.JWT_EXPIRE_DAYS * 86400,
                 str(user.id),
             )
-            print(f"Redis key set: refresh_token:{refresh_token}")
+            logger.debug(f"Redis key set: refresh_token:{refresh_token}")
         except Exception as e:
-            print(f"Redis Error: {str(e)}")
+            logger.error(f"Redis Error: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Authentication service error",
+            )
 
         return TokenResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer",
+            access_token=access_token, refresh_token=refresh_token
         )
 
-    async def refresh_tokens(
-        self, refresh_token: str, user: User
-    ) -> tuple[str, str]:
+    async def process_token_refresh(self, refresh_token: str) -> TokenResponse:
         """
-        Validate a refresh token, blacklist it, and issue new tokens.
-
-        Args:
-            refresh_token: The refresh token to validate
-            user: The user to validate
-
+        Process a token refresh request.
         Returns:
-            Tuple of (new_access_token, new_refresh_token)
+            TokenResponse with new access and refresh tokens
         """
-        # Create payload for access token
-        payload = {
-            "sub": user.username,
-            "role": user.role,
-            "group_id": user.group_id,
-        }
+        # Check if token is blacklisted
+        is_blacklisted = await self.redis_client.exists(
+            f"blacklist:{refresh_token}"
+        )
+        if is_blacklisted:
+            raise InvalidTokenError("Invalid or expired token")
 
-        tokens = self.jwt_manager.get_tokens(payload)
-        access_token = tokens.access_token
-        refresh_token = tokens.refresh_token
+        # Get the user ID associated with this refresh token
+        user_id = await self.redis_client.get(f"refresh_token:{refresh_token}")
+        if not user_id:
+            raise InvalidTokenError("Invalid token")
 
-        # Store refresh token in Redis with user ID
+        # Delete old refresh token and blacklist it in one atomic operation
+        await self.redis_client.delete(f"refresh_token:{refresh_token}")
         await self.redis_client.setex(
-            f"refresh_token:{refresh_token}",
-            settings.JWT_EXPIRE_DAYS * 86400,
-            str(user.id),
+            f"blacklist:{refresh_token}", 3600, "blacklisted"
         )
 
-        return access_token, refresh_token
+        # Get the user
+        user = await self.get_user_by_id(user_id)
+        if not user:
+            raise UserNotFoundError()
+
+        # Create and return new tokens
+        return await self._create_user_tokens(user)
 
     async def get_user_by_id(self, user_id: str) -> Optional[User]:
         result = await self.db.get(User, uuid.UUID(user_id))

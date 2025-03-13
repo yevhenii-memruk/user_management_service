@@ -18,6 +18,12 @@ class InvalidAuthorizationTokenError(HTTPException):
         )
 
 
+class InvalidTokenError(Exception):
+    """Raised when a token is invalid, expired, or blacklisted"""
+
+    pass
+
+
 class InvalidTokenDataError(HTTPException):
     def __init__(self) -> None:
         super().__init__(

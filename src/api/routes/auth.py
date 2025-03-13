@@ -1,6 +1,5 @@
 import logging
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -21,8 +20,10 @@ from src.schemas.auth import (
     TokenResponse,
 )
 from src.schemas.user import UserCreateSchema, UserResponseSchema
-from src.services.auth import AuthService, create_rabbitmq_message
+from src.services.auth import AuthService
+from src.services.password_reset import PasswordResetService
 from src.services.user import UserService
+from src.utils.exceptions import InvalidTokenError
 from src.utils.password_manager import PasswordManager
 
 logger = logging.getLogger(f"ums.{__name__}")
@@ -32,6 +33,7 @@ db_dependency = Annotated[AsyncSession, Depends(get_session)]
 rabbitmq_dependency = Annotated[
     RabbitMQPublisher, Depends(get_rabbitmq_publisher)
 ]
+redis_dependency = Annotated[Redis, Depends(get_redis)]
 
 
 @router.post(
@@ -105,60 +107,24 @@ async def login(
 async def refresh_token(
     request: TokenRefreshRequest,
     db: db_dependency,
-    redis: Redis = Depends(get_redis),
+    redis: redis_dependency,
 ) -> TokenResponse:
     """
     Refresh the access token using a valid refresh token.
-    The old refresh token is blacklisted.
+    The old refresh token is blacklisted by Redis.
     """
     auth_service = AuthService(db, redis)
-    user_service = UserService(db)
     try:
-        is_blacklisted = await redis.exists(
-            f"blacklist:{request.refresh_token}"
+        new_tokens = await auth_service.process_token_refresh(
+            request.refresh_token
         )
-        if is_blacklisted:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        # Get the user ID associated with this refresh token from Redis
-        user_id = await redis.get(f"refresh_token:{request.refresh_token}")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        # Delete old refresh token from Redis
-        await redis.delete(f"refresh_token:{request.refresh_token}")
-
-        # Add refresh token to blacklist
-        await redis.setex(
-            f"blacklist:{request.refresh_token}", 3600, "blacklisted"
+        return new_tokens
+    except InvalidTokenError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+            headers={"WWW-Authenticate": "Bearer"},
         )
-
-        user = await user_service.get_user_by_id(UUID(user_id))
-        if not user:
-            # Token exists but user does not
-            await redis.delete(f"refresh_token:{request.refresh_token}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        # Validate and refresh the tokens
-        new_access_token, new_refresh_token = (
-            await auth_service.refresh_tokens(request.refresh_token, user)
-        )
-        return TokenResponse(
-            access_token=new_access_token, refresh_token=new_refresh_token
-        )
-
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -179,30 +145,8 @@ async def reset_password(
     and publishes a message to RabbitMQ for further processing.
     """
     user_service = UserService(db)
+    password_reset_service = PasswordResetService(
+        user_service, rabbitmq_service
+    )
 
-    # Check if the user with provided email exists
-    user = await user_service.get_user_by_email(request.email)
-
-    # For security reasons, always return the same response regardless
-    # of whether the email exists - prevents email enumeration attacks
-    if not user:
-        return {
-            "message": "If your email is registered, "
-            "you will receive a password reset link"
-        }
-
-    # Generate a unique token for password reset
-    message = create_rabbitmq_message(user)
-
-    try:
-        rabbitmq_service.publish_message("reset-password-stream", message)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process password reset request: {str(e)}",
-        )
-
-    return {
-        "message": "If your email is registered, "
-        "you will receive a password reset link"
-    }
+    return await password_reset_service.reset_password(request)

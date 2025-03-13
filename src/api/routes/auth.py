@@ -8,11 +8,20 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.database import get_session
+from src.api.dependencies.rabbitmq import (
+    RabbitMQPublisher,
+    get_rabbitmq_publisher,
+)
 from src.api.dependencies.redis import get_redis
 from src.db.models import User
-from src.schemas.auth import SignupRequest, TokenRefreshRequest, TokenResponse
+from src.schemas.auth import (
+    PasswordResetRequest,
+    SignupRequest,
+    TokenRefreshRequest,
+    TokenResponse,
+)
 from src.schemas.user import UserCreateSchema, UserResponseSchema
-from src.services.auth import AuthService
+from src.services.auth import AuthService, create_rabbitmq_message
 from src.services.user import UserService
 from src.utils.password_manager import PasswordManager
 
@@ -20,6 +29,9 @@ logger = logging.getLogger(f"ums.{__name__}")
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 db_dependency = Annotated[AsyncSession, Depends(get_session)]
+rabbitmq_dependency = Annotated[
+    RabbitMQPublisher, Depends(get_rabbitmq_publisher)
+]
 
 
 @router.post(
@@ -32,6 +44,7 @@ async def signup(
     db: db_dependency,
     password_manager: PasswordManager = Depends(PasswordManager),
 ) -> User:
+
     logger.debug(f"user_data={user_data}")
 
     """
@@ -154,6 +167,42 @@ async def refresh_token(
         )
 
 
-@router.post("/reset-password")
-async def reset_password() -> None:
-    pass
+# POST /auth/reset-password
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(
+    request: PasswordResetRequest,
+    db: db_dependency,
+    rabbitmq_service: rabbitmq_dependency,
+) -> dict[str, str]:
+    """
+    Accepts an email address, verifies it belongs to a registered user,
+    and publishes a message to RabbitMQ for further processing.
+    """
+    user_service = UserService(db)
+
+    # Check if the user with provided email exists
+    user = await user_service.get_user_by_email(request.email)
+
+    # For security reasons, always return the same response regardless
+    # of whether the email exists - prevents email enumeration attacks
+    if not user:
+        return {
+            "message": "If your email is registered, "
+            "you will receive a password reset link"
+        }
+
+    # Generate a unique token for password reset
+    message = create_rabbitmq_message(user)
+
+    try:
+        rabbitmq_service.publish_message("reset-password-stream", message)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process password reset request: {str(e)}",
+        )
+
+    return {
+        "message": "If your email is registered, "
+        "you will receive a password reset link"
+    }

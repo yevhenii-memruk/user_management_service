@@ -1,8 +1,10 @@
 import logging
 import uuid
-from typing import Optional, cast
+from datetime import datetime, timezone
+from typing import Any, Optional, cast
 
 from fastapi import HTTPException, status
+from pydantic import EmailStr
 from redis.asyncio import Redis
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +24,25 @@ def get_jwt_manager() -> JWTManager:
         algorithm=settings.JWT_ALGORITHM,
         expires_minutes=settings.JWT_EXPIRE_MINUTES,
     )
+
+
+def create_rabbitmq_message(user: User) -> dict[str, Any]:
+    reset_token = str(uuid.uuid4())
+
+    # Create reset link
+    reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+
+    # Prepare message for RabbitMQ
+    message = {
+        "email": user.email,
+        "subject": "Password Reset Request",
+        "body": f"Click the following link to reset your password: {reset_link}",
+        "datetime": datetime.now(timezone.utc).isoformat(),
+        "user_id": str(user.id),
+        "reset_token": reset_token,
+    }
+
+    return message
 
 
 class AuthService:
@@ -89,10 +110,6 @@ class AuthService:
             token_type="bearer",
         )
 
-    async def get_user_by_id(self, user_id: str) -> Optional[User]:
-        result = await self.db.get(User, uuid.UUID(user_id))
-        return result
-
     async def refresh_tokens(
         self, refresh_token: str, user: User
     ) -> tuple[str, str]:
@@ -125,3 +142,11 @@ class AuthService:
         )
 
         return access_token, refresh_token
+
+    async def get_user_by_id(self, user_id: str) -> Optional[User]:
+        result = await self.db.get(User, uuid.UUID(user_id))
+        return result
+
+    async def get_user_by_email(self, email: EmailStr) -> Optional[User]:
+        result = await self.db.get(User, email)
+        return result

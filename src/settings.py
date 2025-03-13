@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     RABBITMQ_HOST: str
     RABBITMQ_PORT: int
 
+    # Frontend URL for generating reset links
+    FRONTEND_URL: str
+
     @property
     def postgres_url(self) -> str:
         return (

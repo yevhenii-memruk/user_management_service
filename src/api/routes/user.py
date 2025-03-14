@@ -10,6 +10,7 @@ from src.api.dependencies.database import get_session
 from src.db.models.user import Role, User
 from src.schemas.user import UserResponseSchema, UserUpdateSchema
 from src.services.user import UserService
+from src.utils.exceptions import NotEnoughPermissionsError
 
 router = APIRouter(tags=["users"])
 
@@ -41,9 +42,6 @@ async def update_current_user(
     user_service = UserService(db)
     updated_user = await user_service.update_user(current_user.id, user_update)
 
-    if not updated_user:
-        raise HTTPException(status_code=404, detail="User not found")
-
     return UserResponseSchema.model_validate(updated_user)
 
 
@@ -56,10 +54,7 @@ async def delete_current_user(
     Delete the current user's account.
     """
     user_service = UserService(db)
-    deleted = await user_service.delete_user(current_user.id)
-
-    if not deleted:
-        raise HTTPException(status_code=404, detail="User not found")
+    await user_service.delete_user(current_user.id)
 
     return JSONResponse(status_code=204, content="User deleted")
 
@@ -75,15 +70,8 @@ async def get_user(
     user_service = UserService(db)
     user = await user_service.get_user_by_id(user_id)
 
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if (
-        current_user.role == "MODERATOR"
-        and current_user.group_id != user.group_id
-    ):
-        raise HTTPException(status_code=403, detail="Not allowed")
-    if current_user.role == "USER":
-        raise HTTPException(status_code=403, detail="Not allowed")
+    # Check permissions
+    await user_service.check_user_access_permissions(current_user, user)
 
     return UserResponseSchema.model_validate(user)
 
@@ -100,14 +88,12 @@ async def update_user(
     Accepts new values for the fields to update
     and returns the updated user info.
     """
-    if current_user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="Not allowed")
-
     user_service = UserService(db)
-    updated_user = await user_service.update_user(user_id, user_update)
 
-    if not updated_user:
-        raise HTTPException(status_code=404, detail="User not found")
+    # Check permissions
+    await user_service.check_admin_access_permissions(current_user)
+
+    updated_user = await user_service.update_user(user_id, user_update)
 
     return UserResponseSchema.model_validate(updated_user)
 
@@ -134,9 +120,7 @@ async def get_users_list(
     user_service = UserService(db)
 
     if current_user.role not in [Role.ADMIN, Role.MODERATOR]:
-        raise HTTPException(
-            status_code=403, detail="Not authorized to view user list"
-        )
+        raise NotEnoughPermissionsError()
 
     try:
         users = await user_service.get_all_users(

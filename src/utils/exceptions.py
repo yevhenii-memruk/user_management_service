@@ -1,11 +1,13 @@
+from typing import Optional
+
 from fastapi import HTTPException, status
 
 
-class PayloadDecodeError(HTTPException):
+class InvalidCredentialsException(HTTPException):
     def __init__(self) -> None:
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Incorrect login or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -32,14 +34,6 @@ class InvalidTokenDataError(HTTPException):
         )
 
 
-class UserNotFoundError(HTTPException):
-    def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
-
-
 class UserBlockedError(HTTPException):
     def __init__(self) -> None:
         super().__init__(
@@ -49,8 +43,40 @@ class UserBlockedError(HTTPException):
 
 
 class NotEnoughPermissionsError(HTTPException):
-    def __init__(self) -> None:
+    def __init__(self, detail: Optional[str] = None) -> None:
+        detail = "Not enough permissions"
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions",
+            detail=detail,
+        )
+
+
+class UserNotFoundError(HTTPException):
+    """Exception raised when a user is not found."""
+
+    def __init__(self, user_id: Optional[str] = None):
+        if user_id is None:
+            detail = "User not found"
+        else:
+            detail = f"User with ID {user_id} not found"
+        super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+
+
+class UserAlreadyExistsError(HTTPException):
+    """Exception raised when a user already exists."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email or username already exists",
+        )
+
+
+class GroupNotExistError(HTTPException):
+    """Exception raised when a group is not found."""
+
+    def __init__(self, group_id: int):
+        detail = f"Group with ID {group_id} not found"
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=detail
         )

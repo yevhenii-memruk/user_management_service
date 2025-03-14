@@ -11,10 +11,6 @@ class GroupCreate(GroupBase):
     pass
 
 
-class GroupUpdate(GroupBase):
-    pass
-
-
 class GroupInDB(GroupBase):
     id: int
     created_at: datetime

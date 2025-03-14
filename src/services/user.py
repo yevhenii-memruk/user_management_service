@@ -8,6 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.models import Group, User
 from src.db.models.user import Role
 from src.schemas.user import UserCreateSchema, UserUpdateSchema
+from src.utils.exceptions import (
+    GroupNotExistError,
+    NotEnoughPermissionsError,
+    UserAlreadyExistsError,
+    UserNotFoundError,
+)
 from src.utils.password_manager import PasswordManager
 
 
@@ -19,6 +25,8 @@ class UserService:
     async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
         """Get a user by ID"""
         result = await self.db.execute(select(User).where(User.id == user_id))
+        if not result:
+            raise UserNotFoundError(str(user_id))
         return result.scalars().first()
 
     async def get_user_by_email(self, email: EmailStr) -> Optional[User]:
@@ -51,9 +59,28 @@ class UserService:
         )
         return result.scalars().first()
 
+    async def check_if_user_exists(
+        self, email: EmailStr, username: str
+    ) -> None:
+        user = await self.get_user_by_email_or_username(email, username)
+        if user:
+            raise UserAlreadyExistsError()
+
     async def create_user(self, user_data: UserCreateSchema) -> User:
-        """Create a new user"""
-        user = User(**user_data.model_dump())
+        # Check if User already exists, raise Error if exists
+        await self.check_if_user_exists(user_data.email, user_data.username)
+
+        # Validate User group_id, checks if id exists in Group table
+        if user_data.group_id:
+            await self.check_group_exists(user_data.group_id)
+
+        # Create new user with hashed password
+        hashed_password = self.password_manager.get_hash(user_data.password)
+
+        user = User(
+            **user_data.model_dump(exclude={"password"}),
+            password=hashed_password,
+        )
 
         # Add to database
         self.db.add(user)
@@ -68,16 +95,16 @@ class UserService:
         """Update a user by ID"""
         user = await self.get_user_by_id(user_id)
         if not user:
-            return None
+            raise UserNotFoundError(str(user_id))
 
         # Update user fields
         update_data = user_data.model_dump(exclude_unset=True)
 
-        # Hash password if it's provided
-        if "password" in update_data and update_data["password"]:
-            update_data["password"] = self.password_manager.get_hash(
-                update_data["password"]
-            )
+        # # Hash password if it's provided
+        # if "password" in update_data and update_data["password"]:
+        #     update_data["password"] = self.password_manager.get_hash(
+        #         update_data["password"]
+        #     )
 
         # Update user fields
         for field, value in update_data.items():
@@ -88,25 +115,22 @@ class UserService:
 
         return user
 
-    async def delete_user(self, user_id: UUID) -> bool:
+    async def delete_user(self, user_id: UUID) -> None:
         """Delete a user by ID"""
         user = await self.get_user_by_id(user_id)
         if not user:
-            return False
+            raise UserNotFoundError(str(user_id))
 
         await self.db.delete(user)
         await self.db.commit()
 
-        return True
-
-    async def check_group_exists(self, group_id: int) -> bool:
-        # Check if the group exists in the 'groups' table
+    async def check_group_exists(self, group_id: int) -> None:
+        """Check if the group exists in the 'groups' table"""
         group = await self.db.execute(
             select(Group).where(Group.id == group_id)
         )
-        if group:
-            return True
-        return False
+        if not group:
+            raise GroupNotExistError(group_id)
 
     async def get_all_users(
         self,
@@ -147,3 +171,29 @@ class UserService:
 
         result = await self.db.execute(query)
         return result.unique().scalars().all()
+
+    @staticmethod
+    async def check_user_access_permissions(
+        current_user: User, target_user: Optional[User]
+    ) -> None:
+        """
+        Check if the current user has permission to access the target user's info.
+        """
+        if target_user is None:
+            raise UserNotFoundError()
+        # Users with USER role cannot access other user's info
+        if current_user.role == Role.USER:
+            raise NotEnoughPermissionsError()
+
+        # MODERATOR can only access users in their group
+        if (
+            current_user.role == Role.MODERATOR
+            and current_user.group_id != target_user.group_id
+        ):
+            raise NotEnoughPermissionsError()
+
+    @staticmethod
+    async def check_admin_access_permissions(current_user: User) -> None:
+        """Check if the current user is admin"""
+        if current_user.role != Role.ADMIN:
+            raise NotEnoughPermissionsError()

@@ -4,7 +4,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from src.settings import settings
 from src.utils.exceptions import (
     InvalidAuthorizationTokenError,
-    PayloadDecodeError,
+    InvalidCredentialsException,
 )
 from src.utils.jwt_manager import JWTManager
 
@@ -32,6 +32,6 @@ class JWTBearer(HTTPBearer):
                 token=credentials.credentials
             )
         except HTTPException:
-            raise PayloadDecodeError()
+            raise InvalidCredentialsException()
 
         return payload

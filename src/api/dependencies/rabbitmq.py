@@ -1,6 +1,11 @@
 import json
+from typing import Optional
 
 import pika
+from pika.adapters.blocking_connection import (
+    BlockingChannel,
+    BlockingConnection,
+)
 from pika.exceptions import AMQPConnectionError
 
 from src.settings import settings
@@ -8,8 +13,8 @@ from src.settings import settings
 
 class RabbitMQPublisher:
     def __init__(self) -> None:
-        self.connection = None
-        self.channel = None
+        self.connection: Optional[BlockingConnection] = None
+        self.channel: Optional[BlockingChannel] = None
         self.connect()
 
     def connect(self) -> None:
@@ -49,7 +54,7 @@ class RabbitMQPublisher:
                     content_type="application/json",
                 ),
             )
-        except pika.exceptions.AMQPConnectionError:
+        except AMQPConnectionError:
             # Try to reconnect and publish again
             self.connect()
             self.publish_message(queue_name, message)

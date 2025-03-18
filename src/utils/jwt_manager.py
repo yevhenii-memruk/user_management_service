@@ -26,15 +26,13 @@ class JWTManager:
         self.expires_minutes = expires_minutes
         self.refresh_token_len = refresh_token_len
 
-    def _create_jwt_token(
-        self, data: dict[str, Any], token_type: str = "access"
-    ) -> str:
+    def _create_jwt_token(self, data: dict[str, Any]) -> str:
         """Generate a JWT token with an expired time."""
         payload = data.copy()
         expire = datetime.now(timezone.utc) + timedelta(
             minutes=self.expires_minutes
         )
-        payload.update({"exp": expire, "type": token_type})
+        payload.update({"exp": expire})
 
         return jwt.encode(
             payload=payload,
@@ -45,7 +43,7 @@ class JWTManager:
     def get_tokens(self, payload: dict) -> Tokens:
         """Generate both access and refresh tokens."""
         payload_copy = payload.copy()
-        access_token = self._create_jwt_token(payload_copy, "access")
+        access_token = self._create_jwt_token(payload_copy)
         refresh_token = secrets.token_hex(self.refresh_token_len)
 
         return Tokens(access_token, refresh_token)

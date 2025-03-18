@@ -5,7 +5,7 @@ from redis.asyncio import Redis
 from src.settings import settings
 
 
-async def get_redis() -> AsyncGenerator:
+async def get_redis() -> AsyncGenerator[Redis, None]:
     """
     Dependency for getting Redis connection.
     """

@@ -15,6 +15,7 @@ class UserSchema(BaseModel):
     email: EmailStr
     phone_number: str
     group_id: Optional[int] = None
+    role: Optional[Role] = None
 
     @field_validator("phone_number")
     def validate_polish_phone(cls, value: str) -> str:
@@ -43,6 +44,7 @@ class UserInDB(UserSchema):
     id: UUID
     created_at: datetime
     modified_at: datetime
+    is_blocked: Optional[bool] = None
 
     # Allows Pydantic to extract data from SQLAlchemy ORM models,
     # treating them like dictionaries

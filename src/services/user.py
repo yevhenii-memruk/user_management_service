@@ -1,4 +1,5 @@
-from typing import List, Optional
+import logging
+from typing import Any, List, Literal, Optional
 from uuid import UUID
 
 from pydantic import EmailStr
@@ -7,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.models import Group, User
 from src.db.models.user import Role
-from src.schemas.user import UserCreateSchema, UserUpdateSchema
+from src.schemas.user import (
+    UserCreateSchema,
+    UserResponseSchema,
+    UserUpdateSchema,
+)
 from src.utils.exceptions import (
     GroupNotExistError,
     NotEnoughPermissionsError,
@@ -16,59 +21,75 @@ from src.utils.exceptions import (
 )
 from src.utils.password_manager import PasswordManager
 
+logger = logging.getLogger(f"ums.{__name__}")
+
 
 class UserService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.password_manager = PasswordManager()
 
+    async def get_user(self, **filters: Any) -> Optional[User]:
+        """
+        Generic function to get a user by any filter.
+
+        Usage:
+        - `await get_user(id=user_id)`
+        - `await get_user(email=email)`
+        - `await get_user(username=username)`
+        - `await get_user(phone_number=phone_number)`
+        """
+
+        logger.debug(f"filters: {filters}")
+
+        key, value = filters.popitem()
+        query = select(User).where(getattr(User, key) == value)
+        result = await self.db.execute(query)
+        if not result:
+            raise UserNotFoundError()
+        user = result.scalars().first()
+
+        return user
+
     async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
         """Get a user by ID"""
-        result = await self.db.execute(select(User).where(User.id == user_id))
-        if not result:
-            raise UserNotFoundError(str(user_id))
-        return result.scalars().first()
+        return await self.get_user(id=user_id)
 
     async def get_user_by_email(self, email: EmailStr) -> Optional[User]:
         """Get a user by email"""
-        result = await self.db.execute(select(User).where(User.email == email))
-        return result.scalars().first()
+        return await self.get_user(email=email)
 
     async def get_user_by_username(self, username: str) -> Optional[User]:
         """Get a user by username"""
-        result = await self.db.execute(
-            select(User).where(User.username == username)
-        )
-        return result.scalars().first()
+        return await self.get_user(username=username)
 
     async def get_user_by_phone(self, phone_number: str) -> Optional[User]:
         """Get a user by phone number"""
-        result = await self.db.execute(
-            select(User).where(User.phone_number == phone_number)
-        )
-        return result.scalars().first()
-
-    async def get_user_by_email_or_username(
-        self, email: EmailStr, username: str
-    ) -> Optional[User]:
-        """Get a user by email or username"""
-        result = await self.db.execute(
-            select(User).where(
-                or_(User.email == email, User.username == username)
-            )
-        )
-        return result.scalars().first()
+        return await self.get_user(phone_number=phone_number)
 
     async def check_if_user_exists(
-        self, email: EmailStr, username: str
+        self, email: EmailStr, username: str, phone_number: str
     ) -> None:
-        user = await self.get_user_by_email_or_username(email, username)
-        if user:
+        user = await self.db.execute(
+            select(User).where(
+                or_(
+                    User.email == email,
+                    User.username == username,
+                    User.phone_number == phone_number,
+                )
+            )
+        )
+        result = user.scalars().first()
+        if result:
             raise UserAlreadyExistsError()
 
-    async def create_user(self, user_data: UserCreateSchema) -> User:
+    async def create_user(
+        self, user_data: UserCreateSchema
+    ) -> UserResponseSchema:
         # Check if User already exists, raise Error if exists
-        await self.check_if_user_exists(user_data.email, user_data.username)
+        await self.check_if_user_exists(
+            user_data.email, user_data.username, user_data.phone_number
+        )
 
         # Validate User group_id, checks if id exists in Group table
         if user_data.group_id:
@@ -87,26 +108,16 @@ class UserService:
         await self.db.commit()
         await self.db.refresh(user)
 
-        return user
+        return UserResponseSchema.model_validate(user)
 
     async def update_user(
         self, user_id: UUID, user_data: UserUpdateSchema
     ) -> Optional[User]:
         """Update a user by ID"""
         user = await self.get_user_by_id(user_id)
-        if not user:
-            raise UserNotFoundError(str(user_id))
 
         # Update user fields
         update_data = user_data.model_dump(exclude_unset=True)
-
-        # # Hash password if it's provided
-        # if "password" in update_data and update_data["password"]:
-        #     update_data["password"] = self.password_manager.get_hash(
-        #         update_data["password"]
-        #     )
-
-        # Update user fields
         for field, value in update_data.items():
             setattr(user, field, value)
 
@@ -138,8 +149,8 @@ class UserService:
         page: int,
         limit: int,
         filter_by_name: Optional[str] = None,
-        sort_by: Optional[str] = None,
-        order_by: str = "asc",
+        sort_by: Optional[Literal["id", "name", "email", "created_at"]] = None,
+        order_by: Literal["asc", "desc"] = "asc",
     ) -> List[User]:
 
         query = select(User)
@@ -152,7 +163,12 @@ class UserService:
 
         # Apply name filter if provided
         if filter_by_name:
-            query = query.filter(User.name.ilike(f"%{filter_by_name}%"))
+            query = query.filter(
+                or_(
+                    User.name.ilike(f"%{filter_by_name}%"),
+                    User.surname.ilike(f"%{filter_by_name}%"),
+                )
+            )
 
         # Handle sorting
         if sort_by is not None and hasattr(User, sort_by):

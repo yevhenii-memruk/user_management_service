@@ -28,7 +28,7 @@ def get_jwt_manager() -> JWTManager:
     return JWTManager(
         secret_key=settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM,
-        expires_minutes=settings.JWT_EXPIRE_MINUTES,
+        expires_minutes=settings.JWT_ACCESS_EXPIRE_MINUTES,
     )
 
 
@@ -65,10 +65,14 @@ class AuthService:
         """
         Authenticate a user by login (email or username) and password.
         """
-        # Try to find user by email or username
+        # Try to find user by email, username or phone number
         result = await self.db.execute(
             select(User).where(
-                or_(User.email == login, User.username == login)
+                or_(
+                    User.email == login,
+                    User.username == login,
+                    User.phone_number == login,
+                )
             )
         )
         user = result.scalars().first()
@@ -100,7 +104,7 @@ class AuthService:
         try:
             await self.redis_client.setex(
                 f"refresh_token:{refresh_token}",
-                settings.JWT_EXPIRE_DAYS * 86400,
+                settings.JWT_REFRESH_EXPIRE_DAYS * 86400,
                 str(user.id),
             )
             logger.debug(f"Redis key set: refresh_token:{refresh_token}")
@@ -139,7 +143,9 @@ class AuthService:
             # Delete old refresh token and blacklist it in one atomic operation
             await self.redis_client.delete(f"refresh_token:{refresh_token}")
             await self.redis_client.setex(
-                f"blacklist:{refresh_token}", 3600, "blacklisted"
+                f"blacklist:{refresh_token}",
+                settings.JWT_REFRESH_EXPIRE_DAYS,
+                "blacklisted",
             )
 
             # Get the user

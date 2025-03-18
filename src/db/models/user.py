@@ -29,7 +29,9 @@ class User(Base):
         String(50), nullable=False, unique=True, index=True
     )
     password: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone_number: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    phone_number: Mapped[str | None] = mapped_column(
+        String(15), nullable=True, unique=True
+    )
     email: Mapped[str] = mapped_column(
         String(), nullable=False, unique=True, index=True
     )

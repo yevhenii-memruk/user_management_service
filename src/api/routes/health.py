@@ -1,11 +1,15 @@
+import logging
+
 from fastapi import APIRouter
 
-router = APIRouter(tags=["health"])
+from src.schemas.health import HealthCheckResponse
+
+logger = logging.getLogger(f"ums.{__name__}")
+router = APIRouter()
 
 
 @router.get("/healthcheck")
-async def healthcheck() -> dict[str, str]:
-    """
-    Endpoint to check if the service is up and running.
-    """
-    return {"status": "ok"}
+async def healthcheck() -> HealthCheckResponse:
+    logger.info("Healthcheck endpoint accessed")
+
+    return HealthCheckResponse(message="ok")

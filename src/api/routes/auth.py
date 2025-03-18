@@ -24,7 +24,7 @@ from src.services.password_reset import PasswordResetService
 from src.services.user import UserService
 
 logger = logging.getLogger(f"ums.{__name__}")
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter()
 
 db_dependency = Annotated[AsyncSession, Depends(get_session)]
 rabbitmq_dependency = Annotated[
@@ -47,7 +47,7 @@ async def signup(
     user_service = UserService(db)
     created_user = await user_service.create_user(user_data)
 
-    return UserResponseSchema.model_validate(created_user)
+    return created_user
 
 
 @router.post("/login", response_model=TokenResponse)

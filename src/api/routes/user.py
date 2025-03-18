@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional
+from typing import Annotated, List, Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,7 +12,7 @@ from src.schemas.user import UserResponseSchema, UserUpdateSchema
 from src.services.user import UserService
 from src.utils.exceptions import NotEnoughPermissionsError
 
-router = APIRouter(tags=["users"])
+router = APIRouter()
 
 user_from_jwt = Annotated[User, Depends(get_current_active_user)]
 db_dependency = Annotated[AsyncSession, Depends(get_session)]
@@ -108,8 +108,10 @@ async def get_users_list(
     filter_by_name: Optional[str] = Query(
         None, description="Filter by name or surname"
     ),
-    sort_by: Optional[str] = Query(None, description="Field to sort by"),
-    order_by: str = Query("asc", description="Sort order"),
+    sort_by: Optional[
+        Literal["id", "name", "surname", "email", "created_at"]
+    ] = Query(None, description="Field to sort by"),
+    order_by: Literal["asc", "desc"] = Query("asc", description="Sort order"),
 ) -> List[UserResponseSchema]:
     """
     Get a list of users with pagination, filtering, and sorting.
@@ -133,4 +135,4 @@ async def get_users_list(
         )
         return users
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e))

@@ -7,7 +7,7 @@ from src.api.routes.user import router as user_router
 
 router = APIRouter()
 
-router.include_router(user_router)
-router.include_router(auth_router)
-router.include_router(health_router)
-router.include_router(root_router)
+router.include_router(user_router, tags=["users"])
+router.include_router(auth_router, prefix="/auth", tags=["authentication"])
+router.include_router(health_router, tags=["healthcheck"])
+router.include_router(root_router, tags=["root"])

@@ -2,16 +2,18 @@ import logging
 
 from fastapi import APIRouter
 
-router = APIRouter(tags=["health"])
+from src.schemas.root import RootResponse
 
 logger = logging.getLogger(f"ums.{__name__}")
 
+router = APIRouter()
+
 
 @router.get("/")
-async def root() -> dict[str, str]:
+async def root() -> RootResponse:
     logger.info("Root endpoint accessed")
-    return {
-        "message": "Welcome to User Management Microservice",
-        "docs": "/docs",
-        "redoc": "/redoc",
-    }
+    return RootResponse(
+        message="Welcome to User Management Microservice",
+        docs="/docs",
+        redoc="/redoc",
+    )

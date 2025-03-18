@@ -2,7 +2,6 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
-from fastapi.security import OAuth2PasswordRequestForm
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +12,7 @@ from src.api.dependencies.rabbitmq import (
 )
 from src.api.dependencies.redis import get_redis
 from src.schemas.auth import (
+    LoginRequest,
     PasswordResetRequest,
     SignupRequest,
     TokenRefreshRequest,
@@ -53,7 +53,7 @@ async def signup(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     db: db_dependency,
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    request: LoginRequest,
     redis: Redis = Depends(get_redis),
 ) -> TokenResponse:
     """
@@ -61,8 +61,9 @@ async def login(
     Login can be done with username or email.
     """
     auth_service = AuthService(db, redis)
+
     user_tokens = await auth_service.authenticate_user(
-        login=form_data.username, password=form_data.password
+        login=request.login, password=request.password
     )
 
     return user_tokens

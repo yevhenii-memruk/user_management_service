@@ -1,7 +1,6 @@
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional, cast
+from typing import Optional, cast
 
 from fastapi import HTTPException, status
 from pydantic import EmailStr
@@ -18,38 +17,10 @@ from src.utils.exceptions import (
     UserBlockedError,
     UserNotFoundError,
 )
-from src.utils.jwt_manager import JWTManager
+from src.utils.jwt_manager import get_jwt_manager
 from src.utils.password_manager import PasswordManager
 
 logger = logging.getLogger(f"ums.{__name__}")
-
-
-def get_jwt_manager() -> JWTManager:
-    return JWTManager(
-        secret_key=settings.JWT_SECRET_KEY,
-        algorithm=settings.JWT_ALGORITHM,
-        expires_minutes=settings.JWT_ACCESS_EXPIRE_MINUTES,
-    )
-
-
-def create_rabbitmq_message(user: User) -> dict[str, Any]:
-    reset_token = str(uuid.uuid4())
-
-    # Create reset link
-    reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
-
-    # Prepare message for RabbitMQ
-    message = {
-        "email": user.email,
-        "subject": "Password Reset Request",
-        "body": f"Click the following link "
-        f"to reset your password: {reset_link}",
-        "datetime": datetime.now(timezone.utc).isoformat(),
-        "user_id": str(user.id),
-        "reset_token": reset_token,
-    }
-
-    return message
 
 
 class AuthService:
@@ -76,6 +47,9 @@ class AuthService:
             )
         )
         user = result.scalars().first()
+
+        if not user:
+            raise UserNotFoundError()
 
         if not self.password_manager.verify_password(
             plain_password=password, hashed_password=cast(str, user.password)
@@ -104,7 +78,7 @@ class AuthService:
         try:
             await self.redis_client.setex(
                 f"refresh_token:{refresh_token}",
-                settings.JWT_REFRESH_EXPIRE_DAYS * 86400,
+                settings.JWT_REFRESH_TOKEN_EXPIRATION_SECONDS * 86400,
                 str(user.id),
             )
             logger.debug(f"Redis key set: refresh_token:{refresh_token}")
@@ -144,7 +118,7 @@ class AuthService:
             await self.redis_client.delete(f"refresh_token:{refresh_token}")
             await self.redis_client.setex(
                 f"blacklist:{refresh_token}",
-                settings.JWT_REFRESH_EXPIRE_DAYS,
+                settings.JWT_REFRESH_TOKEN_EXPIRATION_SECONDS,
                 "blacklisted",
             )
 

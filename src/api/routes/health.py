@@ -8,7 +8,7 @@ logger = logging.getLogger(f"ums.{__name__}")
 router = APIRouter()
 
 
-@router.get("/healthcheck")
+@router.get("/")
 async def healthcheck() -> HealthCheckResponse:
     logger.info("Healthcheck endpoint accessed")
 

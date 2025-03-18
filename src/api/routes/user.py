@@ -1,16 +1,15 @@
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.auth import get_current_active_user
 from src.api.dependencies.database import get_session
-from src.db.models.user import Role, User
+from src.db.models.user import User
 from src.schemas.user import UserResponseSchema, UserUpdateSchema
 from src.services.user import UserService
-from src.utils.exceptions import NotEnoughPermissionsError
 
 router = APIRouter()
 
@@ -19,7 +18,7 @@ db_dependency = Annotated[AsyncSession, Depends(get_session)]
 
 
 # GET /user/me
-@router.get("/user/me", response_model=UserResponseSchema)
+@router.get("/me", response_model=UserResponseSchema)
 async def get_current_user_info(
     current_user: user_from_jwt,
 ) -> UserResponseSchema:
@@ -30,7 +29,7 @@ async def get_current_user_info(
 
 
 # PATCH /user/me
-@router.patch("/user/me", response_model=UserResponseSchema)
+@router.patch("/me", response_model=UserResponseSchema)
 async def update_current_user(
     user_update: UserUpdateSchema,
     current_user: user_from_jwt,
@@ -46,7 +45,7 @@ async def update_current_user(
 
 
 # DELETE /user/me
-@router.delete("/user/me", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_current_user(
     current_user: user_from_jwt, db: db_dependency
 ) -> JSONResponse:
@@ -60,7 +59,7 @@ async def delete_current_user(
 
 
 # GET /user/{user_id}
-@router.get("/user/{user_id}", response_model=UserResponseSchema)
+@router.get("/{user_id}", response_model=UserResponseSchema)
 async def get_user(
     user_id: UUID, db: db_dependency, current_user: user_from_jwt
 ) -> UserResponseSchema:
@@ -77,7 +76,7 @@ async def get_user(
 
 
 # PATCH /user/{user_id}
-@router.patch("/user/{user_id}", response_model=UserResponseSchema)
+@router.patch("/{user_id}", response_model=UserResponseSchema)
 async def update_user(
     user_id: UUID,
     user_update: UserUpdateSchema,
@@ -96,43 +95,3 @@ async def update_user(
     updated_user = await user_service.update_user(user_id, user_update)
 
     return UserResponseSchema.model_validate(updated_user)
-
-
-# GET /users
-@router.get("/users", response_model=List[UserResponseSchema])
-async def get_users_list(
-    current_user: user_from_jwt,
-    db: db_dependency,
-    page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(30, ge=1, le=100, description="Items per page"),
-    filter_by_name: Optional[str] = Query(
-        None, description="Filter by name or surname"
-    ),
-    sort_by: Optional[
-        Literal["id", "name", "surname", "email", "created_at"]
-    ] = Query(None, description="Field to sort by"),
-    order_by: Literal["asc", "desc"] = Query("asc", description="Sort order"),
-) -> List[UserResponseSchema]:
-    """
-    Get a list of users with pagination, filtering, and sorting.
-    - ADMIN: can see all users
-    - MODERATOR: can only see users in their group
-    - Other roles: not authorized
-    """
-    user_service = UserService(db)
-
-    if current_user.role not in [Role.ADMIN, Role.MODERATOR]:
-        raise NotEnoughPermissionsError()
-
-    try:
-        users = await user_service.get_all_users(
-            current_user=current_user,
-            page=page,
-            limit=limit,
-            filter_by_name=filter_by_name,
-            sort_by=sort_by,
-            order_by=order_by,
-        )
-        return users
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))

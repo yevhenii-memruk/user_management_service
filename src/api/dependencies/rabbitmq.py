@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Optional
 
 import pika
@@ -9,6 +10,8 @@ from pika.adapters.blocking_connection import (
 from pika.exceptions import AMQPConnectionError
 
 from src.settings import settings
+
+logger = logging.getLogger(f"ums.{__name__}")
 
 
 class RabbitMQPublisher:
@@ -39,7 +42,7 @@ class RabbitMQPublisher:
                 queue="reset-password-stream", durable=True
             )
         except Exception as e:
-            print(f"Error connecting to RabbitMQ: {e}")
+            logger.error(f"Error connecting to RabbitMQ: {e}")
             raise
 
     def publish_message(self, queue_name: str, message: dict) -> None:
@@ -59,7 +62,7 @@ class RabbitMQPublisher:
             self.connect()
             self.publish_message(queue_name, message)
         except Exception as e:
-            print(f"Error publishing message: {e}")
+            logger.error(f"Error publishing message: {e}")
             raise
 
     def close(self) -> None:

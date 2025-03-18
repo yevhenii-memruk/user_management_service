@@ -6,6 +6,8 @@ from typing import Any
 import jwt
 from fastapi import HTTPException, status
 
+from src.settings import settings
+
 
 @dataclass(frozen=True, slots=True)
 class Tokens:
@@ -76,3 +78,11 @@ class JWTManager:
             )
 
         return payload
+
+
+def get_jwt_manager() -> JWTManager:
+    return JWTManager(
+        secret_key=settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM,
+        expires_minutes=settings.JWT_ACCESS_TOKEN_EXPIRATION_SECONDS,
+    )

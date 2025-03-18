@@ -29,9 +29,9 @@ class UserService:
         self.db = db
         self.password_manager = PasswordManager()
 
-    async def get_user(self, **filters: Any) -> Optional[User]:
+    async def get_user(self, **filter: dict[str, Any]) -> Optional[User]:
         """
-        Generic function to get a user by any filter.
+        Retrieve a user using a single key-value pair.
 
         Usage:
         - `await get_user(id=user_id)`
@@ -40,9 +40,9 @@ class UserService:
         - `await get_user(phone_number=phone_number)`
         """
 
-        logger.debug(f"filters: {filters}")
+        logger.debug(f"filters: {filter}")
 
-        key, value = filters.popitem()
+        key, value = filter.popitem()
         query = select(User).where(getattr(User, key) == value)
         result = await self.db.execute(query)
         if not result:

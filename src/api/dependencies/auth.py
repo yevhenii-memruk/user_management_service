@@ -22,7 +22,7 @@ logger = logging.getLogger(f"ums.{__name__}")
 jwt_manager = JWTManager(
     secret_key=settings.JWT_SECRET_KEY,
     algorithm=settings.JWT_ALGORITHM,
-    expires_minutes=settings.JWT_ACCESS_EXPIRE_MINUTES,
+    expires_minutes=settings.JWT_ACCESS_TOKEN_EXPIRATION_SECONDS,
 )
 
 jwt_bearer = JWTBearer(jwt_manager=jwt_manager)

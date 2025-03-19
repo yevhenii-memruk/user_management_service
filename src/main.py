@@ -6,8 +6,8 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.routes import router
 from src.logger import configure_logger
-from src.schemas.health import HealthCheckResponse
 from src.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -30,12 +30,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-
-@app.get("/healthcheck", response_model=HealthCheckResponse)
-async def healthcheck() -> HealthCheckResponse:
-    logger.info("Healthcheck")
-    return HealthCheckResponse(message="OK")
-
+app.include_router(router)
 
 if __name__ == "__main__":
     uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)

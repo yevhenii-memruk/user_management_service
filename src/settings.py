@@ -18,8 +18,8 @@ class Settings(BaseSettings):
 
     # JWT
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 30
-    JWT_EXPIRE_DAYS: int = 7
+    JWT_ACCESS_TOKEN_EXPIRATION_SECONDS: int = 30 * 60
+    JWT_REFRESH_TOKEN_EXPIRATION_SECONDS: int = 7 * 24 * 60 * 60
     JWT_SECRET_KEY: str
 
     # PostgreSQL
@@ -32,13 +32,16 @@ class Settings(BaseSettings):
     # Redis
     REDIS_HOST: str
     REDIS_PORT: int
-    REDIS_PASSWORD: str
+    REDIS_DB: int
 
     # RabbitMQ
     RABBITMQ_USER: str
     RABBITMQ_PASSWORD: str
     RABBITMQ_HOST: str
     RABBITMQ_PORT: int
+
+    # Frontend URL for generating reset links
+    FRONTEND_URL: str
 
     @property
     def postgres_url(self) -> str:

@@ -1,14 +1,11 @@
+import re
 from datetime import datetime
-from enum import Enum
 from typing import Optional
+from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-
-class UserRole(str, Enum):
-    ADMIN = "ADMIN"
-    MODERATOR = "MODERATOR"
-    USER = "USER"
+from src.db.models.user import Role
 
 
 class UserSchema(BaseModel):
@@ -16,25 +13,21 @@ class UserSchema(BaseModel):
     surname: str = Field(..., min_length=1, max_length=100)
     username: str = Field(..., min_length=3, max_length=100)
     email: EmailStr
-    phone_number: Optional[str] = Field(None, min_length=10, max_length=15)
+    phone_number: str
+    group_id: Optional[int] = None
+    role: Optional[Role] = None
+
+    @field_validator("phone_number")
+    def validate_polish_phone(cls, value: str) -> str:
+        if not re.fullmatch(r"\+48\d{9}$", value):
+            raise ValueError(
+                "Polish phone number must be in format '+48XXXXXXXXX'"
+            )
+        return value
 
 
 class UserCreateSchema(UserSchema):
     password: str = Field(..., min_length=8, max_length=128)
-    group_id: Optional[int] = None
-
-
-class UserResponseSchema(UserSchema):
-    id: UUID4
-    role: UserRole
-    is_blocked: bool = False
-    created_at: datetime
-    modified_at: datetime
-    group_id: Optional[int] = None
-
-    # Allows Pydantic to extract data from SQLAlchemy ORM models,
-    # treating them like dictionaries
-    model_config = ConfigDict(from_attributes=True)
 
 
 class UserUpdateSchema(BaseModel):
@@ -43,5 +36,20 @@ class UserUpdateSchema(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=100)
     email: Optional[EmailStr] = None
     phone_number: Optional[str] = Field(None, min_length=10, max_length=15)
-    role: Optional[UserRole] = None
+    role: Optional[Role] = None
     is_blocked: Optional[bool] = None
+
+
+class UserInDB(UserSchema):
+    id: UUID
+    created_at: datetime
+    modified_at: datetime
+    is_blocked: Optional[bool] = None
+
+    # Allows Pydantic to extract data from SQLAlchemy ORM models,
+    # treating them like dictionaries
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserResponseSchema(UserInDB):
+    pass

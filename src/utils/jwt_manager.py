@@ -6,6 +6,8 @@ from typing import Any
 import jwt
 from fastapi import HTTPException, status
 
+from src.settings import settings
+
 
 @dataclass(frozen=True, slots=True)
 class Tokens:
@@ -42,15 +44,16 @@ class JWTManager:
 
     def get_tokens(self, payload: dict) -> Tokens:
         """Generate both access and refresh tokens."""
-        access_token = self._create_jwt_token(payload)
+        payload_copy = payload.copy()
+        access_token = self._create_jwt_token(payload_copy)
         refresh_token = secrets.token_hex(self.refresh_token_len)
 
         return Tokens(access_token, refresh_token)
 
-    def get_payload(self, token: str) -> dict[str, Any]:
+    def decode_jwt_token(self, token: str) -> dict[str, Any]:
         """Verify and decode a JWT token."""
         try:
-            return jwt.decode(
+            payload = jwt.decode(
                 jwt=token,
                 key=self.secret_key,
                 algorithms=[self.algorithm],
@@ -73,3 +76,13 @@ class JWTManager:
                 detail="Invalid token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+
+        return payload
+
+
+def get_jwt_manager() -> JWTManager:
+    return JWTManager(
+        secret_key=settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM,
+        expires_minutes=settings.JWT_ACCESS_TOKEN_EXPIRATION_SECONDS,
+    )

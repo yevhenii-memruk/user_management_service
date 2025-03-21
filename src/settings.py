@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # Frontend URL for generating reset links
     FRONTEND_URL: str
 
+    # AWS
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
+    AWS_REGION: str = "ue-north-1"
+    AWS_S3_BUCKET: str
+
     @property
     def postgres_url(self) -> str:
         return (

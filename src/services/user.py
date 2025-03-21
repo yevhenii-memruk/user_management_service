@@ -29,7 +29,7 @@ class UserService:
         self.db = db
         self.password_manager = PasswordManager()
 
-    async def get_user(self, **filter: dict[str, Any]) -> Optional[User]:
+    async def get_user(self, **filter: Any) -> Optional[User]:
         """
         Retrieve a user using a single key-value pair.
 
@@ -187,6 +187,16 @@ class UserService:
 
         result = await self.db.execute(query)
         return result.unique().scalars().all()
+
+    async def update_user_field(
+        self, user_id: UUID, field: str, field_value: Optional[str]
+    ) -> Optional[User]:
+        user = await self.get_user_by_id(user_id)
+        setattr(user, field, field_value)
+        await self.db.commit()
+        await self.db.refresh(user)
+
+        return user
 
     @staticmethod
     async def check_user_access_permissions(

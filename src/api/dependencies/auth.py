@@ -4,13 +4,12 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.database import get_session
-from src.db.models.user import Role, User
+from src.db.models.user import User
 from src.schemas.user import UserResponseSchema
 from src.services.user import UserService
 from src.settings import settings
 from src.utils.exceptions import (
     InvalidTokenDataError,
-    NotEnoughPermissionsError,
     UserBlockedError,
     UserNotFoundError,
 )
@@ -58,27 +57,3 @@ async def get_current_active_user(
         raise UserBlockedError()
 
     return UserResponseSchema.model_validate(current_user)
-
-
-async def check_admin_access(
-    current_user: User = Depends(get_current_active_user),
-) -> User:
-    """
-    Dependency to check if the current user has admin role.
-    """
-    if current_user.role != Role.ADMIN:
-        raise NotEnoughPermissionsError()
-
-    return current_user
-
-
-async def check_moderator_access(
-    current_user: User = Depends(get_current_active_user),
-) -> User:
-    """
-    Dependency to check if the current user has moderator or admin role.
-    """
-    if current_user.role not in (Role.ADMIN, Role.MODERATOR):
-        raise NotEnoughPermissionsError()
-
-    return current_user

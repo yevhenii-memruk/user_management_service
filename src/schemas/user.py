@@ -16,6 +16,7 @@ class UserSchema(BaseModel):
     phone_number: str
     group_id: Optional[int] = None
     role: Optional[Role] = None
+    image_s3_path: Optional[str] = None
 
     @field_validator("phone_number")
     def validate_polish_phone(cls, value: str) -> str:
@@ -53,3 +54,12 @@ class UserInDB(UserSchema):
 
 class UserResponseSchema(UserInDB):
     pass
+
+
+class UserImageS3PathSchema(BaseModel):
+    id: UUID
+    username: str
+    image_s3_path: Optional[str] = None
+    image_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)

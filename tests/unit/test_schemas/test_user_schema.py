@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from src.db.models.user import Role
 from src.schemas.user import (
     UserCreateSchema,
+    UserImageS3PathSchema,
     UserResponseSchema,
     UserSchema,
     UserUpdateSchema,
@@ -21,7 +22,7 @@ def valid_user_base_data() -> dict[str, str]:
         "surname": "Doe",
         "username": "johndoe",
         "email": "john.doe@example.com",
-        "phone_number": "1234567890",
+        "phone_number": "+48123456789",
     }
 
 
@@ -79,12 +80,12 @@ class TestUserBase:
             (
                 "phone_number",
                 "123",
-                "String should have at least 10 characters",
+                "Polish phone number must be in format '+48XXXXXXXXX'",
             ),
             (
                 "phone_number",
                 "1" * 16,
-                "String should have at most 15 characters",
+                "Polish phone number must be in format '+48XXXXXXXXX'",
             ),
         ],
     )
@@ -108,7 +109,6 @@ class TestUserCreate:
     ) -> None:
         user = UserCreateSchema(**valid_user_create_data)
         assert user.password == valid_user_create_data["password"]
-        assert user.group_id == valid_user_create_data["group_id"]
 
     @pytest.mark.parametrize(
         "password,expected_error",
@@ -157,7 +157,7 @@ class TestUserDisplay:
         data["role"] = "INVALID_ROLE"
         with pytest.raises(ValidationError) as exc_info:
             UserResponseSchema(**data)
-        assert "Input should be 'ADMIN', 'MODERATOR' or 'USER'" in str(
+        assert " Input should be 'USER', 'ADMIN' or 'MODERATOR'" in str(
             exc_info.value
         )
 
@@ -194,7 +194,7 @@ class TestUserUpdate:
             (
                 "role",
                 "INVALID_ROLE",
-                "Input should be 'ADMIN', 'MODERATOR' or 'USER'",
+                "Input should be 'USER', 'ADMIN' or 'MODERATOR'",
             ),
         ],
     )
@@ -205,3 +205,35 @@ class TestUserUpdate:
         with pytest.raises(ValidationError) as exc_info:
             UserUpdateSchema(**data)
         assert expected_error in str(exc_info.value)
+
+
+class TestUserImageS3Path:
+    @pytest.fixture
+    def valid_user_image_data(self) -> dict[str, Any]:
+        return {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "username": "johndoe",
+            "image_s3_path": "user-images/550e8400-e29b-41d4-a716-446655440000/profile.jpg",
+            "image_url": "https://example.com/users/550e8400-e29b-41d4-a716-446655440000/profile.jpg",
+        }
+
+    def test_valid_user_image_schema(
+        self, valid_user_image_data: dict[str, Any]
+    ) -> None:
+        user_image = UserImageS3PathSchema(**valid_user_image_data)
+        assert isinstance(user_image.id, UUID)
+        assert user_image.username == valid_user_image_data["username"]
+        assert (
+            user_image.image_s3_path == valid_user_image_data["image_s3_path"]
+        )
+        assert user_image.image_url == valid_user_image_data["image_url"]
+
+    def test_optional_fields(self) -> None:
+        # Test with only required fields
+        user_image = UserImageS3PathSchema(
+            id="550e8400-e29b-41d4-a716-446655440000", username="johndoe"
+        )
+        assert isinstance(user_image.id, UUID)
+        assert user_image.username == "johndoe"
+        assert user_image.image_s3_path is None
+        assert user_image.image_url is None

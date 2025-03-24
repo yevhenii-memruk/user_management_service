@@ -7,6 +7,7 @@ from fastapi import HTTPException, UploadFile, status
 
 from src.db.models import User
 from src.settings import settings
+from src.utils.exceptions import InternalServerError
 
 logger = logging.getLogger(f"ums.{__name__}")
 
@@ -70,12 +71,17 @@ class S3Service:
             return None
 
         try:
+            logger.info("Getting image URL for user's image")
             async with self.session.client("s3") as s3:
                 url = await s3.generate_presigned_url(
                     "get_object",
                     Params={"Bucket": self.bucket_name, "Key": s3_path},
                     ExpiresIn=expiration,
                 )
+                if not url:
+                    raise InternalServerError(
+                        "Failed to generate pre-signed URL for S3 object."
+                    )
                 return url
         except Exception as e:
             logger.error(f"Error generating presigned URL: {str(e)}")

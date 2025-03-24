@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int
     POSTGRES_NAME: str
 
+    # Test PostgreSQL
+    TEST_DATABASE_URL: str
+
     # Redis
     REDIS_HOST: str
     REDIS_PORT: int
@@ -46,7 +49,7 @@ class Settings(BaseSettings):
     # AWS
     AWS_ACCESS_KEY_ID: str
     AWS_SECRET_ACCESS_KEY: str
-    AWS_REGION: str = "ue-north-1"
+    AWS_REGION: str = "eu-central-1"
     AWS_S3_BUCKET: str
 
     @property

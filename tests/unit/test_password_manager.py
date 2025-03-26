@@ -62,3 +62,12 @@ def test_mocked_password_manager() -> None:
         mock_manager.verify_password("wrongpassword", "mocked_hashed_password")
         is False
     )
+
+
+@pytest.mark.parametrize("password", ["password", "123456", "qwerty"])
+def test_weak_passwords(
+    password_manager: PasswordManager, password: str
+) -> None:
+    """Ensure weak passwords are still hashed but different."""
+    hashed_password = password_manager.get_hash(password)
+    assert hashed_password != password

@@ -71,9 +71,5 @@ class RabbitMQPublisher:
             self.connection.close()
 
 
-# Create a singleton instance
-rabbitmq_publisher = RabbitMQPublisher()
-
-
 async def get_rabbitmq_publisher() -> RabbitMQPublisher:
-    return rabbitmq_publisher
+    return RabbitMQPublisher()

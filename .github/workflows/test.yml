@@ -1,0 +1,73 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready -U test_user -d test_db
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:6
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.poetry/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      run: |
+        poetry install --with dev
+
+    - name: Run linters & formatters
+      run: |
+        poetry run ruff check .
+        poetry run black --check .
+        poetry run isort . --check --profile black
+
+    - name: Run tests
+      run: |
+        poetry run pytest --cov=src
+      env:
+        POSTGRES_USER: test_user
+        POSTGRES_PASSWORD: test_password
+        POSTGRES_HOST: localhost
+        POSTGRES_DB: test_db
+        POSTGRES_PORT: 5433  # Matches test DB port
+        TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5433/test_db
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379

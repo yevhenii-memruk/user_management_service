@@ -15,7 +15,7 @@ from src.schemas.user import (
     UserUpdateSchema,
 )
 from src.services.user import UserService
-from src.utils.exceptions import InternalServerError
+from src.utils.exceptions import InternalServerError, UserNotFoundError
 
 router = APIRouter()
 
@@ -144,6 +144,9 @@ async def get_user_image_url(
     # Get the user
     user_service = UserService(db)
     user = await user_service.get_user_by_id(user_id=user_id)
+
+    if not user:
+        raise UserNotFoundError()
 
     # Verify permissions
     await user_service.check_user_access_permissions(current_user, user)

@@ -14,7 +14,7 @@ def jwt_manager() -> JWTManager:
     return get_jwt_manager()
 
 
-def test_access_token_creation(jwt_manager) -> None:
+def test_access_token_creation(jwt_manager: JWTManager) -> None:
     """Test creating and validating access tokens."""
     user_payload = {
         "sub": "123e4567-e89b-12d3-a456-426614174000",
@@ -39,7 +39,7 @@ def test_access_token_creation(jwt_manager) -> None:
     assert exp_time > datetime.now(timezone.utc)
 
 
-def test_refresh_token_creation(jwt_manager) -> None:
+def test_refresh_token_creation(jwt_manager: JWTManager) -> None:
     """Test that refresh tokens are properly generated."""
     tokens = jwt_manager.get_tokens({"sub": "test_user_id"})
 
@@ -47,7 +47,7 @@ def test_refresh_token_creation(jwt_manager) -> None:
     assert len(tokens.refresh_token) == jwt_manager.refresh_token_len * 2
 
 
-def test_token_expiry(jwt_manager) -> None:
+def test_token_expiry(jwt_manager: JWTManager) -> None:
     """Test that an expired token raises an exception."""
     expired_token = jwt.encode(
         {
@@ -65,7 +65,7 @@ def test_token_expiry(jwt_manager) -> None:
     assert "Token has expired" in exc_info.value.detail
 
 
-def test_invalid_token(jwt_manager) -> None:
+def test_invalid_token(jwt_manager: JWTManager) -> None:
     """Test that an invalid token raises an exception."""
     invalid_token = "invalid.jwt.token"
 
@@ -78,16 +78,40 @@ def test_invalid_token(jwt_manager) -> None:
 
 def test_wrong_secret_key() -> None:
     """Test decoding with a wrong secret key fails."""
-    jwt_manager = JWTManager(
-        secret_key="wrong_secret",
+    # Create a token with the correct secret
+    correct_jwt_manager = JWTManager(
+        secret_key=settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM,
         expires_minutes=settings.JWT_ACCESS_TOKEN_EXPIRATION_SECONDS,
     )
 
     user_payload = {"sub": "user123"}
-    tokens = jwt_manager.get_tokens(user_payload)
+    tokens = correct_jwt_manager.get_tokens(user_payload)
+
+    # Try decoding with the WRONG secret key
+    wrong_jwt_manager = JWTManager(
+        secret_key="wrong_secret_key",
+        algorithm=settings.JWT_ALGORITHM,
+        expires_minutes=settings.JWT_ACCESS_TOKEN_EXPIRATION_SECONDS,
+    )
 
     with pytest.raises(HTTPException) as exc_info:
-        jwt_manager.decode_jwt_token(tokens.access_token)
+        wrong_jwt_manager.decode_jwt_token(tokens.access_token)
 
     assert exc_info.value.status_code == 401
+    assert "Invalid signature" in exc_info.value.detail
+
+
+def test_invalid_algorithm(jwt_manager: JWTManager) -> None:
+    """Test that a token signed with a different algorithm fails."""
+    different_alg_token = jwt.encode(
+        {"sub": "user123"},
+        jwt_manager.secret_key,
+        algorithm="HS512",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        jwt_manager.decode_jwt_token(different_alg_token)
+
+    assert exc_info.value.status_code == 401
+    assert "Invalid token" in exc_info.value.detail

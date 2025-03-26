@@ -18,4 +18,4 @@ async def get_redis() -> AsyncGenerator[Redis, None]:
     try:
         yield redis_client
     finally:
-        await redis_client.close()
+        await redis_client.aclose()

@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import uuid
 from enum import StrEnum
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from src.db.models import Base, Group
+from src.db.models import Base
+
+if TYPE_CHECKING:
+    from src.db.models.group import Group
 
 Timestamp = Annotated[
     DateTime, mapped_column(DateTime, server_default=func.now())

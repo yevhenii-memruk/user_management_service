@@ -8,7 +8,7 @@ LogLevel: TypeAlias = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=find_dotenv(".env", raise_error_if_not_found=True)
+        env_file=find_dotenv(".env", raise_error_if_not_found=False)
     )
 
     PROJECT_NAME: str = "User Management Service"

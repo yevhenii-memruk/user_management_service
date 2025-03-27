@@ -70,6 +70,11 @@ jobs:
         poetry run black --check .
         poetry run isort . --check --profile black
 
+    - name: 'Create env file'
+      run: |
+        touch .env
+        echo "${{ secrets.ENV_FILE }}" >> .env
+
     - name: Run tests
       run: |
         poetry run pytest .

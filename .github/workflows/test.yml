@@ -6,6 +6,17 @@ on:
   pull_request:
     branches: [ main, dev ]
 
+env:
+  POSTGRES_USER: test_user
+  POSTGRES_PASSWORD: test_password
+  POSTGRES_HOST: localhost
+  POSTGRES_DB: test_db
+  POSTGRES_PORT: 5433  # Matches test DB port
+  TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5433/test_db
+  REDIS_HOST: localhost
+  REDIS_PORT: 6379
+
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -62,12 +73,3 @@ jobs:
     - name: Run tests
       run: |
         poetry run pytest .
-      env:
-        POSTGRES_USER: test_user
-        POSTGRES_PASSWORD: test_password
-        POSTGRES_HOST: localhost
-        POSTGRES_DB: test_db
-        POSTGRES_PORT: 5433  # Matches test DB port
-        TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5433/test_db
-        REDIS_HOST: localhost
-        REDIS_PORT: 6379

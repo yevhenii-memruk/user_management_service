@@ -1,15 +1,8 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.models import Base
 from src.db.models.user import Timestamp
-
-if TYPE_CHECKING:
-    from src.db.models.user import User
 
 
 class Group(Base):
@@ -20,8 +13,8 @@ class Group(Base):
     created_at: Mapped[Timestamp]
 
     # Relationship
-    users: Mapped[list["User"]] = relationship(
-        "User", back_populates="group", lazy="joined"
+    users = relationship(
+        "User", back_populates="group", uselist=True, lazy="joined"
     )
 
     def __repr__(self) -> str:

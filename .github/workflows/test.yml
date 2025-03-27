@@ -61,7 +61,7 @@ jobs:
 
     - name: Run tests
       run: |
-        poetry run pytest --cov=src
+        poetry run pytest .
       env:
         POSTGRES_USER: test_user
         POSTGRES_PASSWORD: test_password

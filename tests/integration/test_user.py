@@ -30,7 +30,7 @@ async def test_update_user_me(client: AsyncClient, user_token_headers) -> None:
     }
 
     response = await client.patch(
-        "/user/me", json=update_data, headers=user_token_headers
+        "/user/me", data=update_data, headers=user_token_headers
     )
 
     assert response.status_code == 200

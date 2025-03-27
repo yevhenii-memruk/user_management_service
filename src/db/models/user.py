@@ -6,7 +6,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from src.db.models import Base
+from src.db.models import Base, Group
 
 Timestamp = Annotated[
     DateTime, mapped_column(DateTime, server_default=func.now())

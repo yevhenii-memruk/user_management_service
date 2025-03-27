@@ -1,11 +1,13 @@
 import logging
-from typing import Any, List, Literal, Optional
+from typing import Annotated, Any, List, Literal, Optional
 from uuid import UUID
 
+from fastapi import Depends, HTTPException, UploadFile, status
 from pydantic import EmailStr
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.aws.s3_service import S3Service, get_s3_service
 from src.db.models import Group, User
 from src.db.models.user import Role
 from src.schemas.user import (
@@ -20,6 +22,8 @@ from src.utils.exceptions import (
     UserNotFoundError,
 )
 from src.utils.password_manager import PasswordManager
+
+s3_service_dependency = Annotated[S3Service, Depends(get_s3_service)]
 
 logger = logging.getLogger(f"ums.{__name__}")
 
@@ -111,13 +115,33 @@ class UserService:
         return UserResponseSchema.model_validate(user)
 
     async def update_user(
-        self, user_id: UUID, user_data: UserUpdateSchema
+        self,
+        user_id: UUID,
+        user_data: UserUpdateSchema,
+        s3_service: Optional[S3Service] = None,
+        file: Optional[UploadFile] = None,
     ) -> Optional[User]:
         """Update a user by ID"""
         user = await self.get_user_by_id(user_id)
+        if not user:
+            logger.error(f"User with ID {user_id} not found!")
+            return None
+
+        update_data = user_data.model_dump(exclude_unset=True)
+
+        if file:
+            if not s3_service:
+                logger.error(
+                    "S3 service is required for file upload but was not provided!"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="S3 service is required for file upload",
+                )
+            s3_path = await self.update_user_image(user, file, s3_service)
+            update_data["image_s3_path"] = s3_path
 
         # Update user fields
-        update_data = user_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(user, field, value)
 
@@ -223,3 +247,17 @@ class UserService:
         """Check if the current user is admin"""
         if current_user.role != Role.ADMIN:
             raise NotEnoughPermissionsError()
+
+    @staticmethod
+    async def update_user_image(
+        current_user: User, file: UploadFile, s3_service: s3_service_dependency
+    ) -> str:
+        # Validate file type
+        await s3_service.validate_user_image(file, current_user)
+
+        # Upload to S3
+        s3_path = await s3_service.upload_user_image(
+            current_user.id, file.file, file.content_type
+        )
+
+        return s3_path

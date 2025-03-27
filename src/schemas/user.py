@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
+from fastapi import Form
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from src.db.models.user import Role
@@ -39,6 +40,27 @@ class UserUpdateSchema(BaseModel):
     phone_number: Optional[str] = Field(None, min_length=10, max_length=15)
     role: Optional[Role] = None
     is_blocked: Optional[bool] = None
+
+    @classmethod
+    def as_form(
+        cls,
+        name: Optional[str] = Form(None, min_length=1),
+        surname: Optional[str] = Form(None, min_length=1),
+        username: Optional[str] = Form(None, min_length=3),
+        email: Optional[EmailStr] = Form(None),
+        phone_number: Optional[str] = Form(None),
+        role: Optional[str] = Form(None),  # Or Enum if required
+        is_blocked: Optional[bool] = Form(None),
+    ) -> "UserUpdateSchema":
+        return cls(
+            name=name,
+            surname=surname,
+            username=username,
+            email=email,
+            phone_number=phone_number,
+            role=role,
+            is_blocked=is_blocked,
+        )
 
 
 class UserInDB(UserSchema):

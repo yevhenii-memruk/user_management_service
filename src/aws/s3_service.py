@@ -3,11 +3,12 @@ from typing import BinaryIO, Optional
 from uuid import UUID
 
 import aioboto3
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException, UploadFile, status
 
 from src.db.models import User
 from src.settings import settings
-from src.utils.exceptions import InternalServerError
+from src.utils.exceptions import InternalServerError, S3UploadError
 
 logger = logging.getLogger(f"ums.{__name__}")
 
@@ -15,13 +16,19 @@ logger = logging.getLogger(f"ums.{__name__}")
 class S3Service:
     """Service for handling S3 operations"""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        aws_access_key: str,
+        aws_secret_key: str,
+        region: str,
+        bucket_name: str,
+    ) -> None:
         self.session = aioboto3.Session(
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            region_name=settings.AWS_REGION,
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_key,
+            region_name=region,
         )
-        self.bucket_name = settings.AWS_S3_BUCKET
+        self.bucket_name = bucket_name
 
     async def upload_user_image(
         self, user_id: UUID, file: BinaryIO, content_type: str
@@ -53,9 +60,15 @@ class S3Service:
                     f"Successfully uploaded image for user {user_id} to S3"
                 )
                 return file_path
+        except ClientError as e:
+            logger.error(f"S3 ClientError: {e}")
+            raise S3UploadError(detail="Failed to upload image to S3")
+        except BotoCoreError as e:
+            logger.error(f"S3 BotoCoreError: {e}")
+            raise S3UploadError(detail="AWS S3 encountered an internal issue")
         except Exception as e:
             logger.error(f"Error uploading image to S3: {str(e)}")
-            raise
+            raise S3UploadError(detail="Unexpected error during file upload")
 
     async def get_user_image_url(
         self, s3_path: str, expiration: int = 3600
@@ -101,8 +114,7 @@ class S3Service:
             logger.error(f"Error deleting image from S3: {str(e)}")
             return False
 
-    @staticmethod
-    async def validate_user_image(file: UploadFile, user: User) -> None:
+    async def validate_user_image(self, file: UploadFile, user: User) -> None:
         """Validate file type, check file size, delete image if exists."""
         allowed_types = ["image/jpeg", "image/png", "image/gif"]
         if file.content_type not in allowed_types:
@@ -126,8 +138,13 @@ class S3Service:
 
         # Delete old image if exists
         if user.image_s3_path:
-            await s3_service.delete_user_image(user.image_s3_path)
+            await self.delete_user_image(user.image_s3_path)
 
 
-# Singleton
-s3_service = S3Service()
+def get_s3_service() -> S3Service:
+    return S3Service(
+        aws_access_key=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_key=settings.AWS_SECRET_ACCESS_KEY,
+        region=settings.AWS_REGION,
+        bucket_name=settings.AWS_S3_BUCKET,
+    )

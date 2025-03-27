@@ -89,3 +89,12 @@ class InternalServerError(HTTPException):
         super().__init__(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail
         )
+
+
+class S3UploadError(HTTPException):
+    """Exception raised when S3 upload fails"""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail
+        )

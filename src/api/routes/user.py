@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 from uuid import UUID
 
@@ -7,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.auth import get_current_active_user
 from src.api.dependencies.database import get_session
-from src.aws.s3_service import s3_service
+from src.aws.s3_service import S3Service, get_s3_service
 from src.db.models.user import User
 from src.schemas.user import (
     UserImageS3PathSchema,
@@ -17,10 +18,14 @@ from src.schemas.user import (
 from src.services.user import UserService
 from src.utils.exceptions import InternalServerError, UserNotFoundError
 
+logger = logging.getLogger(f"ums.{__name__}")
+
 router = APIRouter()
 
+# Dependencies
 user_from_jwt = Annotated[User, Depends(get_current_active_user)]
 db_dependency = Annotated[AsyncSession, Depends(get_session)]
+s3_service_dependency = Annotated[S3Service, Depends(get_s3_service)]
 
 
 # GET /user/me
@@ -37,15 +42,19 @@ async def get_current_user_info(
 # PATCH /user/me
 @router.patch("/me", response_model=UserResponseSchema)
 async def update_current_user(
-    user_update: UserUpdateSchema,
     current_user: user_from_jwt,
     db: db_dependency,
+    s3_service: s3_service_dependency,
+    user_update: UserUpdateSchema = Depends(UserUpdateSchema.as_form),
+    file: UploadFile = File(default=None),
 ) -> UserResponseSchema:
     """
     Update current user's information.
     """
     user_service = UserService(db)
-    updated_user = await user_service.update_user(current_user.id, user_update)
+    updated_user = await user_service.update_user(
+        current_user.id, user_update, s3_service, file=file
+    )
 
     return UserResponseSchema.model_validate(updated_user)
 
@@ -108,6 +117,7 @@ async def update_user(
 async def upload_user_image(
     current_user: user_from_jwt,
     db: db_dependency,
+    s3_service: s3_service_dependency,
     file: UploadFile = File(...),
 ) -> UserImageS3PathSchema:
     """
@@ -116,27 +126,27 @@ async def upload_user_image(
     # Validate file type
     await s3_service.validate_user_image(file, current_user)
 
-    try:
-        # Upload to S3
-        s3_path = await s3_service.upload_user_image(
-            current_user.id, file.file, file.content_type
-        )
+    # Upload to S3
+    s3_path = await s3_service.upload_user_image(
+        current_user.id, file.file, file.content_type
+    )
 
-        # Update user record with new image path
-        user_service = UserService(db)
-        user = await user_service.update_user_field(
-            current_user.id, "image_s3_path", s3_path
-        )
+    # Update user record with new image path
+    user_service = UserService(db)
+    user = await user_service.update_user_field(
+        current_user.id, "image_s3_path", s3_path
+    )
 
-        return UserImageS3PathSchema.model_validate(user)
-    except Exception as e:
-        raise InternalServerError(f"Error uploading image: {str(e)}")
+    return UserImageS3PathSchema.model_validate(user)
 
 
 # GET /{user_id}/image-url
 @router.get("/{user_id}/image-url", response_model=UserImageS3PathSchema)
 async def get_user_image_url(
-    user_id: UUID, current_user: user_from_jwt, db: db_dependency
+    user_id: UUID,
+    current_user: user_from_jwt,
+    db: db_dependency,
+    s3_service: s3_service_dependency,
 ) -> UserImageS3PathSchema:
     """
     Get a presigned URL for a user's profile image
@@ -162,7 +172,9 @@ async def get_user_image_url(
 # DELETE /me/image
 @router.delete("/me/image", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user_image(
-    current_user: user_from_jwt, db: db_dependency
+    current_user: user_from_jwt,
+    db: db_dependency,
+    s3_service: s3_service_dependency,
 ) -> JSONResponse:
     """
     Delete the current user's profile image

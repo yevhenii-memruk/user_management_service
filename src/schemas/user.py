@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
+from fastapi import Form
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from src.db.models.user import Role
@@ -16,6 +17,7 @@ class UserSchema(BaseModel):
     phone_number: str
     group_id: Optional[int] = None
     role: Optional[Role] = None
+    image_s3_path: Optional[str] = None
 
     @field_validator("phone_number")
     def validate_polish_phone(cls, value: str) -> str:
@@ -39,6 +41,27 @@ class UserUpdateSchema(BaseModel):
     role: Optional[Role] = None
     is_blocked: Optional[bool] = None
 
+    @classmethod
+    def as_form(
+        cls,
+        name: Optional[str] = Form(None, min_length=1),
+        surname: Optional[str] = Form(None, min_length=1),
+        username: Optional[str] = Form(None, min_length=3),
+        email: Optional[EmailStr] = Form(None),
+        phone_number: Optional[str] = Form(None),
+        role: Optional[str] = Form(None),  # Or Enum if required
+        is_blocked: Optional[bool] = Form(None),
+    ) -> "UserUpdateSchema":
+        return cls(
+            name=name,
+            surname=surname,
+            username=username,
+            email=email,
+            phone_number=phone_number,
+            role=role,
+            is_blocked=is_blocked,
+        )
+
 
 class UserInDB(UserSchema):
     id: UUID
@@ -53,3 +76,12 @@ class UserInDB(UserSchema):
 
 class UserResponseSchema(UserInDB):
     pass
+
+
+class UserImageS3PathSchema(BaseModel):
+    id: UUID
+    username: str
+    image_s3_path: Optional[str] = None
+    image_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)

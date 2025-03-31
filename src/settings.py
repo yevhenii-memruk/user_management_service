@@ -8,7 +8,8 @@ LogLevel: TypeAlias = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=find_dotenv(".env", raise_error_if_not_found=True)
+        env_file=find_dotenv(".env", raise_error_if_not_found=True),
+        extra="allow",
     )
 
     PROJECT_NAME: str = "User Management Service"
@@ -29,6 +30,9 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int
     POSTGRES_NAME: str
 
+    # Test PostgreSQL
+    TEST_DATABASE_URL: str
+
     # Redis
     REDIS_HOST: str
     REDIS_PORT: int
@@ -41,7 +45,13 @@ class Settings(BaseSettings):
     RABBITMQ_PORT: int
 
     # Frontend URL for generating reset links
-    FRONTEND_URL: str
+    FRONTEND_URL: str = "http://localhost"
+
+    # AWS
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_REGION: str = "eu-central-1"
+    AWS_S3_BUCKET: str = ""
 
     @property
     def postgres_url(self) -> str:

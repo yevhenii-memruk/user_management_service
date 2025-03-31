@@ -64,6 +64,11 @@ class JWTManager:
                 detail="Token has expired",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        except jwt.InvalidSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid signature. Token may have been tampered with.",
+            )
         except jwt.DecodeError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

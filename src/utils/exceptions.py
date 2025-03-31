@@ -80,3 +80,21 @@ class GroupNotExistError(HTTPException):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST, detail=detail
         )
+
+
+class InternalServerError(HTTPException):
+    """Exception raised when an internal server error occurs."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail
+        )
+
+
+class S3UploadError(HTTPException):
+    """Exception raised when S3 upload fails"""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail
+        )

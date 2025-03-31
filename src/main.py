@@ -16,21 +16,30 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     configure_logger()
+    logger.info("App is starting...")
     yield  # app starts
     logger.info("App shutdown")
 
 
-app = FastAPI(lifespan=lifespan, title=settings.PROJECT_NAME)
+def create_app() -> FastAPI:
+    """
+    Factory function to create FastAPI app instance.
+    """
+    app = FastAPI(lifespan=lifespan, title=settings.PROJECT_NAME)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
-)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
 
-app.include_router(router)
+    app.include_router(router)
+    return app
+
+
+app = create_app()
 
 if __name__ == "__main__":
     uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)
